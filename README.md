@@ -14,5 +14,5 @@ Papers
 
 # -> RCWA:
 
-MATLAB code for simulation.
+MATLAB code for simulating oeriodic silicon nanorods.
 
