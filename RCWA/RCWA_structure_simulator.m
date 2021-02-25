@@ -22,6 +22,6 @@ for i = s_start:1:s_end
     i
 end
 
-% when finish simulating, also change the filename with 0-9  denoting the
+% it is better to save for 1000 data points everytime. when finish simulating, also change the filename with 0-9  denoting the
 % nth thousand datasets and move to the folder \data_generated. eg: RCWA_spectrum_0.mat for 1-1000 data.
 
