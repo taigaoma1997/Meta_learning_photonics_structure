@@ -1,0 +1,22 @@
+% This is used for simulate the corresponding reflection sppectrum based on
+% the structure parameters from the RCWA_structure1.mat
+
+
+s_start  = 1;
+s_end = 10;
+spectrum = [];
+load('RCWA_structure1.mat');
+
+acc = 10;
+stepcase = 5;
+show1 = 0;
+
+for i = s_start:1:s_end
+    [height, gap, period, diameter] = sampled[i,:];
+    refls = RCWA_Silicon(sampled(i,1), sampled(i,1), acc, show1,stepcase);
+    spectrum[i,:] = refls;
+    
+    
+end
+
+    
