@@ -7,14 +7,14 @@ function refls= RCWA_Silicon(height,gap,period,diameter,acc, show1,stepcase)
     shape=0;
     
     for i =1:1:81
-        %[trans(i), refs(i)]=RCWA_solver(wave(i),gap,height,radius,acc,medium,shape);
         wavelength=wave(i);
         addpath('RCWA\RETICOLO V8\reticolo_allege')
 
         [prv,vmax]=retio([],inf*1i); % never write on the disc (nod to do retio)
-        load('RCWA\poly_Si.mat');
+        %load('RCWA\poly_Si.mat');
         %load('RCWA\Si3N4.mat');
         load('RCWA\Si3N4_new.mat');
+        load('RCWA\Si.mat');
         n_Si = interp1(WL, R, wavelength)+1i*interp1(WL, I, wavelength);
         n_SiN =interp1(WL_SiN, R_SiN, wavelength)+1i*0;
         periods = [period,period];% same unit as wavelength
@@ -27,7 +27,7 @@ function refls= RCWA_Silicon(height,gap,period,diameter,acc, show1,stepcase)
         parm.sym.pol = 1; % TE
         parm.res1.champ = 1; % the eletromagnetic field is calculated accurately
         parm.sym.x=0;parm.sym.y=0;% use of symetry
-        %parm.res1.trace=1;
+        %parm.res1.trace=1; %show the refractive index distribution 
 
         nn=[acc,acc];
         % textures for all layers including the top and bottom
@@ -43,11 +43,15 @@ function refls= RCWA_Silicon(height,gap,period,diameter,acc, show1,stepcase)
 
         two_D=res2(aa,profile);
         n_order = size(two_D.TEinc_top_transmitted.efficiency_TE,1);
-        trans(i) = sum(two_D.TEinc_top_transmitted.efficiency_TE);
+        trans(i) = sum(two_D.TEinc_top_transmitted.efficiency_TE); % sum over all orders 
         refls(i) = sum(two_D.TEinc_top_reflected.efficiency_TE);
+        %two_D.TEinc_top_reflected.order  % gives the information of order
+        %trans(i) =two_D.TEinc_top_transmitted.efficiency_TE((n_order+1)/2,1) % only contain the 0 order 
+        %refls(i) = two_D.TEinc_top_reflected.efficiency_TE((n_order+1)/2,1);
+        %refls(((9-n_order)/2+1):((9+n_order)/2),i)=two_D.TEinc_top_reflected.efficiency_TE;
     end
     if show1==1
-        figure(2)
+        figure(1)
         plot(wave, trans, wave, refls)
         xlabel('Wavelength/(nm)');
         ylabel('Efficiency');
