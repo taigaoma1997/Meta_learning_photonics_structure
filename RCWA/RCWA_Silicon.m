@@ -1,4 +1,4 @@
-function refls= RCWA_Silicon(height,gap,period,diameter,acc, show1)
+function refls= RCWA_Silicon(height,gap,period,diameter,acc, show1,stepcase)
     wave = 380:5:780;
     trans=[];
     refls =[];
@@ -13,7 +13,8 @@ function refls= RCWA_Silicon(height,gap,period,diameter,acc, show1)
 
         [prv,vmax]=retio([],inf*1i); % never write on the disc (nod to do retio)
         load('RCWA\poly_Si.mat');
-        load('RCWA\Si3N4.mat');
+        %load('RCWA\Si3N4.mat');
+        load('RCWA\Si3N4_new.mat');
         n_Si = interp1(WL, R, wavelength)+1i*interp1(WL, I, wavelength);
         n_SiN =interp1(WL_SiN, R_SiN, wavelength)+1i*0;
         periods = [period,period];% same unit as wavelength
@@ -33,7 +34,7 @@ function refls= RCWA_Silicon(height,gap,period,diameter,acc, show1)
         textures = cell(1,5);
         textures{1}= n_air; % uniform texture
         textures{2}= n_air; % uniform texture
-        textures{3}={n_air,[gap/2,gap/2,diameter,diameter,n_Si,10],[-gap/2,gap/2,diameter,diameter,n_Si,10],[gap/2,-gap/2,diameter,diameter,n_Si,10],[-gap/2,-gap/2,diameter,diameter,n_Si,10]};
+        textures{3}={n_air,[gap/2,gap/2,diameter,diameter,n_Si,stepcase],[-gap/2,gap/2,diameter,diameter,n_Si,stepcase],[gap/2,-gap/2,diameter,diameter,n_Si,stepcase],[-gap/2,-gap/2,diameter,diameter,n_Si,stepcase]};
         textures{4}=n_SiN;
         textures{5}=n_Si;
         aa=res1(wavelength,periods,textures,nn,k_parallel,angle_delta,parm);
