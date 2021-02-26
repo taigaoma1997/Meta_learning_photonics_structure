@@ -22,4 +22,4 @@ for i = CURRENT:1:s_end  % we start from the last data in case the simulation wa
 end
 
 
-fprint('Simulation done! \n');
+fprintf('Simulation done! \n');
