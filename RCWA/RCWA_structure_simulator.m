@@ -4,8 +4,8 @@
 % The parameter columns are [height, gap, period, diameter];
 
 
-s_start  = 1001; % change this to choose the start simulating point
-s_end = 2000; % change this to choose the end simulating point
+s_start  = 2001; % change this to choose the start simulating point
+s_end = 3000; % change this to choose the end simulating point
 N = s_end - s_start +1;
 START = s_start; 
 END = s_end; 
