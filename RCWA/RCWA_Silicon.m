@@ -27,7 +27,7 @@ function refls= RCWA_Silicon(height,gap,period,diameter,acc, show1,stepcase)
         parm.sym.pol = 1; % TE
         parm.res1.champ = 1; % the eletromagnetic field is calculated accurately
         parm.sym.x=0;parm.sym.y=0;% use of symetry
-        %parm.res1.trace=1; %show the refractive index distribution 
+        parm.res1.trace=1; %show the refractive index distribution 
 
         nn=[acc,acc];
         % textures for all layers including the top and bottom

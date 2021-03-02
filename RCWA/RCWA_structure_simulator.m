@@ -27,4 +27,9 @@ end
 fprintf('Simulation done! \n');
 % it is better to save for 1000 data points everytime. when finish simulating, also change the filename with 0-9  denoting the
 % nth thousand datasets and move to the folder \data_generated. eg: RCWA_spectrum_0.mat for 1-1000 data.
-
+count = 0;
+for i  = 1:1:10000
+    if sampled(i,2)+sampled(i,4)>=sampled(i,3)
+        count = count+1;
+    end
+end
