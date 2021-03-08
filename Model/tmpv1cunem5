@@ -45,10 +45,10 @@ def get_configs(experiment):
          'hidden_dim': 128,
          'output_dim': 4,
          'noise_dim': 1,
-         'epochs': 5000,
+         'epochs': 400,
          'weight_decay': 1e-5,
          'g_learning_rate': 1e-6,
-         'd_learning_rate': 1e-7},
+         'd_learning_rate': 1e-5},
 
          'inn':
         {'model_name': 'inn',

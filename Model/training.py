@@ -4,6 +4,8 @@ from torch.utils.data import Dataset, DataLoader
 import numpy as np
 from torch.nn import functional as F
 from utils import MMD_multiscale
+import matplotlib.pyplot as plt
+
 
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
@@ -29,7 +31,7 @@ class Trainer():
         self.criterion = criterion
         self.epochs = epochs
 
-        self.path = './models/' + model_name + '.pth'
+        self.path = './models/' + model_name + '_trained.pth'
 
     def train(self):
         self.model.train()
@@ -61,14 +63,24 @@ class Trainer():
         return loss_epoch / len(dataloader.dataset)
 
     def fit(self):
-
+        temp1 = np.zeros([2,self.epochs]);
         for e in range(self.epochs):
-
+            
             loss_train = self.train()
             loss_val = self.evaluate()
+            temp1[0,e] = loss_train
+            temp1[1,e] = loss_val
             print('Epoch {}, train loss {:.3f}, val loss {:.3f}'.format(
                 e, loss_train, loss_val))
-
+        
+        plt.plot(range(self.epochs),temp1[0,:],label='Training loss')  
+        plt.plot(range(self.epochs),temp1[1,:],label='Val Loss')                      
+        # plot the training and val loss VS epoches.
+        plt.xlabel('epochs')
+        plt.ylabel('Loss')
+        plt.legend()
+        
+        
         loss_test = self.evaluate(test=True)
         print('Training finished! Test loss {:.3f}'.format(loss_test))
 
@@ -144,7 +156,7 @@ class GANTrainer(Trainer):
         self.optimizer_G = optimizer_G
         self.optimizer_D = optimizer_D
 
-        self.path = './models/' + model_name + '.pth'
+        self.path = './models/' + model_name + '_trained.pth'
         
     def train(self):
         self.model.train()
@@ -305,7 +317,7 @@ class INNTrainer(Trainer):
         self.latent_criterion = MMD_multiscale
         self.backward_criterion = MMD_multiscale
 
-        self.path = './models/' + model_name + '.pth'
+        self.path = './models/' + model_name + '_trained.pth'
 
     def train(self):
         self.model.train()
