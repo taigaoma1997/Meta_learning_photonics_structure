@@ -28,9 +28,9 @@ if __name__ == '__main__':
     elif args.model in ['tandem_net']:
 
         forward_model = MLP(4, 3).to(DEVICE)
-        forward_model.load_state_dict(torch.load('./models/forward_model.pth')['model_state_dict'])
+        forward_model.load_state_dict(torch.load('./models/forward_model_trained.pth')['model_state_dict'])
         inverse_model = MLP(3, 4).to(DEVICE)
-        inverse_model.load_state_dict(torch.load('./models/inverse_model.pth')['model_state_dict'])
+        inverse_model.load_state_dict(torch.load('./models/inverse_model_trained.pth')['model_state_dict'])
         model = TandemNet(forward_model, inverse_model)
         optimizer = torch.optim.Adam(model.inverse_model.parameters(), lr=configs['learning_rate'], weight_decay=configs['weight_decay'])
         

@@ -27,7 +27,7 @@ def get_configs(experiment):
         {'model_name': 'tandem_net',
          'input_dim': 3,
          'output_dim': 3,
-         'epochs': 100,
+         'epochs': 300,
          'weight_decay': 1e-5,
          'learning_rate': 1e-3},
 
