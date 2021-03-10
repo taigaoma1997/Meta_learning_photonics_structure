@@ -15,11 +15,13 @@ if CURRENT>END
     fprintf('This simulation is already done! \n');
 else
     for i = CURRENT:1:END   % we start from the last data in case the simulation was stopped at the saving part. 
-    refls = RCWA_Silicon(param_pred_re(i,1), param_pred_re(i,2), param_pred_re(i,3), param_pred_re(i,4), acc, show1,stepcase);
+    tic
+refls = RCWA_Silicon(param_pred_re(i,1), param_pred_re(i,2), param_pred_re(i,3), param_pred_re(i,4), acc, show1,stepcase);
     spectrum(i,:) = refls;
     CURRENT = i;
     save(filename_save,'spectrum', 'START','END', 'CURRENT');
     i
+    toc
     end
 end
 

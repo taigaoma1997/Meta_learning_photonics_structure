@@ -5,13 +5,13 @@ filename = strcat('data_predicted\param_', model, '_pred.mat');
 filename_save = strcat('data_predicted\spectrum\spectrum_param_', model, '_pred.mat');
 
 load(filename);
-
 M = size(param_pred,1);
 N = size(param_pred,2);
 param_pred_re = reshape(param_pred, [], 4);
 
 START = 1;
 END = size(param_pred_re,1);
+
 CURRENT = 1;
 
 acc = 10;

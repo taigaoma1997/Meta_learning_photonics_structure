@@ -5,16 +5,22 @@ function refls= RCWA_Silicon(height,gap,period,diameter,acc, show1,stepcase)
     radius=diameter/2;
     medium=0;
     shape=0;
+    addpath('RCWA\RETICOLO V8\reticolo_allege');
     
-    for i =1:1:81
+    %load('RCWA\poly_Si.mat');
+    %load('RCWA\Si3N4.mat');
+    SiN = load('RCWA\Si3N4_new.mat');
+    Si = load('RCWA\Si.mat');
+    WL = Si.WL;
+    R = Si.R;
+    I = Si.I;
+    WL_SiN = SiN.WL_SiN;
+    R_SiN = SiN.R_SiN;   
+    % for setting up the parallel computing 
+    
+    parfor i =1:1:81
         wavelength=wave(i);
-        addpath('RCWA\RETICOLO V8\reticolo_allege')
-
         [prv,vmax]=retio([],inf*1i); % never write on the disc (nod to do retio)
-        %load('RCWA\poly_Si.mat');
-        %load('RCWA\Si3N4.mat');
-        load('RCWA\Si3N4_new.mat');
-        load('RCWA\Si.mat');
         n_Si = interp1(WL, R, wavelength)+1i*interp1(WL, I, wavelength);
         n_SiN =interp1(WL_SiN, R_SiN, wavelength)+1i*0;
         periods = [period,period];% same unit as wavelength
@@ -50,6 +56,7 @@ function refls= RCWA_Silicon(height,gap,period,diameter,acc, show1,stepcase)
         %refls(i) = two_D.TEinc_top_reflected.efficiency_TE((n_order+1)/2,1);
         %refls(((9-n_order)/2+1):((9+n_order)/2),i)=two_D.TEinc_top_reflected.efficiency_TE;
     end
+    
     if show1==1
         figure(1)
         plot(wave, trans, wave, refls)
