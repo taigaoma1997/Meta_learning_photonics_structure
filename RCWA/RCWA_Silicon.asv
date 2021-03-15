@@ -1,4 +1,4 @@
-function refls= RCWA_Silicon(height, gap, period, diameter, acc, stepcase, show1)
+function refls= RCWA_Silicon(height,gap,period,diameter,acc, show1,stepcase)
     wave = 380:5:780;
     trans=[];
     refls =[];
@@ -11,6 +11,8 @@ function refls= RCWA_Silicon(height, gap, period, diameter, acc, stepcase, show1
         addpath('./RCWA/RETICOLO V8/reticolo_allege')
 
         [prv,vmax]=retio([],inf*1i); % never write on the disc (nod to do retio)
+        %load('./RCWA/poly_Si.mat');
+        %load('RCWA\Si3N4.mat');
         Si3N4_data = load('./RCWA/Si3N4_new.mat');
         Si_data = load('./RCWA/Si.mat');
         WL_SiN = Si3N4_data.WL_SiN;
@@ -35,7 +37,7 @@ function refls= RCWA_Silicon(height, gap, period, diameter, acc, stepcase, show1
         if i == 1
             parm.res1.trace=1; %show the refractive index distribution
         else
-            parm.res1.trace=0; 
+            parm.res1.trace=0;
         end
 
         nn=[acc,acc];
@@ -43,8 +45,8 @@ function refls= RCWA_Silicon(height, gap, period, diameter, acc, stepcase, show1
         textures = cell(1,5);
         textures{1}= n_air; % uniform texture
         textures{2}= n_air; % uniform texture
-        textures{3}={n_air,[gap/2,gap/2,diameter,diameter,n_Si,stepcase],[-gap/2,gap/2,diameter,diameter,n_Si,stepcase],[gap/2,-gap/2,diameter,diameter,n_Si,stepcase],[-gap/2,-gap/2,diameter,diameter,n_Si,stepcase]};
-        % textures{3} = {n_air, [0, 0, diameter, 100, n_Si, stepcase]};
+        % textures{3}={n_air,[gap/2,gap/2,diameter,diameter,n_Si,stepcase],[-gap/2,gap/2,diameter,diameter,n_Si,stepcase],[gap/2,-gap/2,diameter,diameter,n_Si,stepcase],[-gap/2,-gap/2,diameter,diameter,n_Si,stepcase]};
+        textures{3} =
         textures{4}=n_SiN;
         textures{5}=n_Si;
         aa=res1(wavelength,periods,textures,nn,k_parallel,angle_delta,parm);
@@ -61,11 +63,11 @@ function refls= RCWA_Silicon(height, gap, period, diameter, acc, stepcase, show1
         %refls(((9-n_order)/2+1):((9+n_order)/2),i)=two_D.TEinc_top_reflected.efficiency_TE;
     end
     if show1==1
+        figure(1)
         plot(wave, trans, wave, refls)
         xlabel('Wavelength/(nm)');
         ylabel('Efficiency');
         legend({'T','R'})
-        saveas(gcf, 'res.png')
     end
     %save('refls.mat','refls');
 end
