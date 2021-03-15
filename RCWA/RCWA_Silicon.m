@@ -1,4 +1,4 @@
-function refls= RCWA_Silicon(height, gap, period, diameter, acc, stepcase, show1)
+function refls= RCWA_Silicon(height,gap,period,diameter,acc, show1,stepcase)
     wave = 380:5:780;
     trans=[];
     refls =[];
@@ -60,6 +60,7 @@ function refls= RCWA_Silicon(height, gap, period, diameter, acc, stepcase, show1
         %refls(i) = two_D.TEinc_top_reflected.efficiency_TE((n_order+1)/2,1);
         %refls(((9-n_order)/2+1):((9+n_order)/2),i)=two_D.TEinc_top_reflected.efficiency_TE;
     end
+    saveas(gcf,'textures.png')
     if show1==1
         plot(wave, trans, wave, refls)
         xlabel('Wavelength/(nm)');
