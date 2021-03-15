@@ -2,9 +2,16 @@ function refls= RCWA_Silicon(period, height, diameter, acc, stepcase, structure,
     wave = 380:10:780;
     refls =[];
     medium=0;
-    
-    parfor i = 1:length(wave)
-        wavelength=wave(i);
+    num_points = double(length(wave));
+
+    period = double(period);
+    height = double(height);
+    diameter = double(diameter);
+    acc = double(acc);
+    stepcase = double(stepcase);
+
+    for i = 1:num_points
+        wavelength = double(wave(i));
         addpath('./RCWA/RETICOLO V8/reticolo_allege')
 
         [prv,vmax]=retio([],inf*1i); % never write on the disc (nod to do retio)
@@ -52,5 +59,5 @@ function refls= RCWA_Silicon(period, height, diameter, acc, stepcase, structure,
     end
 
     res = transpose([wave; refls]);
-    writematrix(res, sprintf('./meta_learning_data/%s_p%d_h%d_d%d.csv', material, period, height, diameter));
+    writematrix(res, sprintf('./meta_learning_data/%s_%s_p%d_h%d_d%d.csv', structure, material, period, height, diameter));
 end
