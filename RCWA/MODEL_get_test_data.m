@@ -1,6 +1,7 @@
-%%
+%% Load data 
 wave = 380:5:780;
 model = 'inn';  % change this to other model: inn, vae, gan, inverse, tandem 
+
 filename = strcat('data_predicted\param_', model, '_pred.mat');
 filename_save = strcat('data_predicted\spectrum\spectrum_param_', model, '_pred.mat');
 load(filename);
@@ -13,13 +14,14 @@ axis([380 780 0 1]);
 xlabel('Wavelength/(nm)');
 ylabel('Reflection');
 
-%%  only run this for inn model
+%%  only run this if there are some extreme values in spectrum and we want to delete that sudden peak 
 
 wrong = [];
 M = size(spectrum,1);
 N = size(spectrum, 2);
 
-for i = 1:1:M
+for i = 1:1:M    
+    % use 1st order derivative to find the sudden peak/extreme values
     d_s_1 = spectrum(i, 2:N) - spectrum(i,1:(N-1));
     if (max(d_s_1)>=0.25)
         wrong = [wrong, i];
@@ -33,6 +35,7 @@ stepcase = 5;
 show1 = 0;
 figure(2)
 for j = 1:1:N
+    % recalculate those spectrum 
     i = wrong(j)
     wrong_spectrum(j,:) =  RCWA_Silicon(param_pred_re(i,1), param_pred_re(i,2), param_pred_re(i,3), param_pred_re(i,4), acc, show1,stepcase);
    
@@ -45,7 +48,7 @@ for j = 1:1:N
 end
     
 save(filename_save,'spectrum', 'START','END', 'CURRENT');
-%% This part is to transform spectrum data into xyY data and save those data
+%% This part is to transform spectrum data into xyY data and save them
 
 CIE =  importdata('color\cie-cmf.txt');
 load('color\D65.mat');

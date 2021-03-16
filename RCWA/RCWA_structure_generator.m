@@ -29,7 +29,9 @@ while count < N
     period = period_range(1,randi(period_l));
     diameter = diameter_range(1,randi(diameter_l));
     design = [height, gap, period, diameter];
-    if ismember(design, sampled,'rows')    % doesn't include same parameters
+    if ismember(design, sampled,'rows') |  (gap+diameter>=period)
+        % remove same parameters and remove parameters that doesn't satisfy
+        % the structure requirement: gap+diameter<period
         design;
         continue;
     end
