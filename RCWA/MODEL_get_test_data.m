@@ -1,6 +1,6 @@
 %% Load data 
 wave = 380:5:780;
-model = 'inn';  % change this to other model: inn, vae, gan, inverse, tandem 
+model = 'vae';  % change this to other model: inn, vae, gan, inverse, tandem 
 
 filename = strcat('data_predicted\param_', model, '_pred.mat');
 filename_save = strcat('data_predicted\spectrum\spectrum_param_', model, '_pred.mat');
