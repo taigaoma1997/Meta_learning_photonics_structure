@@ -1,8 +1,9 @@
 from utils import count_params, weights_init_normal
 from training import Trainer, GANTrainer, INNTrainer
 from datasets import SiliconColor, get_dataloaders
-from models import MLP, TandemNet, cVAE, cGAN, INN
+from models import MLP, TandemNet, cVAE, cGAN, INN, cVAE_new, cVAE_GSNN, cVAE_Full, cVAE_tandem, cVAE_hybrid
 from configs import get_configs
+import random
 
 import sys
 import torch
@@ -10,12 +11,13 @@ from torch import nn
 
 import argparse
 
+torch.manual_seed(random.randint(1,100))
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser('nn models for inverse design')
-    parser.add_argument('--model', type=str, default='tandem_net')
+    parser.add_argument('--model', type=str, default='vae_hybrid')
     args = parser.parse_args()
 
     train_loader, val_loader, test_loader = get_dataloaders(args.model)
@@ -37,6 +39,41 @@ if __name__ == '__main__':
     elif args.model in ['vae']:
         model = cVAE(configs['input_dim'], configs['latent_dim']).to(DEVICE)
         optimizer = torch.optim.Adam(model.parameters(), lr=configs['learning_rate'], weight_decay=configs['weight_decay'])
+        
+    elif args.model in ['vae_new']:
+        model = cVAE_new(configs['input_dim'], configs['latent_dim']).to(DEVICE)
+        optimizer = torch.optim.Adam(model.parameters(), lr=configs['learning_rate'], weight_decay=configs['weight_decay'])
+        
+    elif args.model in ['vae_GSNN']:
+        model = cVAE_GSNN(configs['input_dim'], configs['latent_dim']).to(DEVICE)
+        optimizer = torch.optim.Adam(model.parameters(), lr=configs['learning_rate'], weight_decay=configs['weight_decay'])
+
+    elif args.model in ['vae_Full']:
+        model = cVAE_Full(configs['input_dim'], configs['latent_dim']).to(DEVICE)
+        optimizer = torch.optim.Adam(model.parameters(), lr=configs['learning_rate'], weight_decay=configs['weight_decay'])
+
+    elif args.model in ['vae_tandem']:
+        model = cVAE_tandem(configs['input_dim'], configs['latent_dim']).to(DEVICE)
+        optimizer = torch.optim.Adam(model.parameters(), lr=configs['learning_rate'], weight_decay=configs['weight_decay'])
+
+
+
+
+
+
+
+    elif args.model in ['vae_hybrid']:
+        forward_model = MLP(4, 3).to(DEVICE)
+        forward_model.load_state_dict(torch.load('./models/forward_model_trained.pth')['model_state_dict'])
+        vae_model = cVAE_Full(configs['input_dim'], configs['latent_dim']).to(DEVICE)
+        vae_model.load_state_dict(torch.load('./models/vae_Full_trained_5.pth')['model_state_dict'])
+        model = cVAE_hybrid(forward_model, vae_model)
+        optimizer = torch.optim.Adam(model.vae_model.parameters(), lr=configs['learning_rate'], weight_decay=configs['weight_decay'])
+
+
+
+
+
 
     elif args.model in ['gan']:
         model = cGAN(configs['input_dim'], configs['output_dim'], configs['noise_dim']).to(DEVICE)
@@ -59,8 +96,8 @@ if __name__ == '__main__':
 
         criterion = torch.nn.MSELoss()
         trainer = INNTrainer(model, optimizer, train_loader, val_loader, test_loader, criterion, configs['epochs'], args.model)
-        trainer.fit()
-
+        #trainer.fit()
+        trainer.fit_inn()
         sys.exit(0)
 
     else:

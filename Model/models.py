@@ -1,4 +1,4 @@
-import torch
+filepath ="data_predicted/xyY/xyY_param_vae_hybrid_pred.mat"import torch
 from torch import nn
 from torch.nn import functional as F
 from torch.utils.data import Dataset, DataLoader
@@ -89,12 +89,10 @@ class cVAE(nn.Module):
         return mu + eps*std
 
     def decode(self, z, y):
-
         recon_x = self.decoder(torch.cat((z, y), dim=1))
         return recon_x
 
     def forward(self, x, y):
-
         h = self.encoder(x)
         y_pred = self.forward_net(h)
 
@@ -103,6 +101,287 @@ class cVAE(nn.Module):
 
         return self.decode(z, y), mu, logvar, y_pred
 
+class cVAE_Full(nn.Module):
+    def __init__(self, input_size, latent_dim, hidden_dim=256, forward_dim=3):
+        super(cVAE_Full, self).__init__()
+
+        self.input_size = input_size
+        self.latent_dim = latent_dim
+
+        # encoder
+        self.encoder = nn.Sequential(*[nn.Linear(input_size+forward_dim, hidden_dim),
+                                       nn.ReLU(),
+                                       nn.BatchNorm1d(hidden_dim),
+                                       nn.Linear(hidden_dim, hidden_dim),
+                                       nn.ReLU()])
+        
+        self.mu_head = nn.Linear(hidden_dim, latent_dim)
+        self.logvar_head = nn.Linear(hidden_dim, latent_dim)
+
+        # decoder
+        self.decoder = nn.Sequential(*[nn.Linear(latent_dim + forward_dim, hidden_dim),
+                                       nn.ReLU(),
+                                       nn.BatchNorm1d(hidden_dim),
+                                       nn.Linear(hidden_dim, hidden_dim),
+                                       nn.ReLU(),
+                                       nn.BatchNorm1d(hidden_dim),
+                                       nn.Linear(hidden_dim, input_size)])
+
+    def encode(self, x):
+        h = self.encoder(x)
+        return self.mu_head(h), self.logvar_head(h)
+
+    def reparameterize(self, mu, logvar):
+        std = torch.exp(0.5*logvar)
+        eps = torch.randn_like(std)
+        return mu + eps*std
+
+    def decode(self, z, y):
+        recon_x = self.decoder(torch.cat((z, y), dim=1))
+        return recon_x
+
+    def forward(self, x, y):
+        y_pred = y
+        h = self.encoder(torch.cat((x, y), dim=1))
+
+        mu, logvar = self.mu_head(h), self.logvar_head(h)
+        z = self.reparameterize(mu, logvar)
+
+        return self.decode(z, y), mu, logvar, y_pred
+    
+    def inference(self, y):
+        
+        mu, logvar = torch.randn([y.size()[0], self.latent_dim]), torch.randn([y.size()[0], self.latent_dim])
+        z = self.reparameterize(mu, logvar)
+        return self.decode(z, y), mu, logvar, y
+
+
+class cVAE_hybrid(nn.Module):
+
+    def __init__(self, forward_model, vae_model):
+        super(cVAE_hybrid, self).__init__()
+        self.forward_model = forward_model
+        self.vae_model = vae_model
+
+    def forward(self, x, y):
+        '''
+        Pass the desired target x to the vae_hybrid network.
+        '''
+        
+        x_pred, mu, logvar, y_pre = self.vae_model(x, y)
+        y_pred = self.pred(x_pred)
+        return x_pred, mu, logvar, y_pred 
+
+    def pred(self, x):
+        pred = self.forward_model(x, None)
+        return pred
+
+
+
+class cVAE_GSNN(nn.Module):
+    def __init__(self, input_size, latent_dim, hidden_dim=256, forward_dim=3):
+        super(cVAE_GSNN, self).__init__()
+
+        self.input_size = input_size
+        self.latent_dim = latent_dim
+
+        # encoder
+        self.encoder = nn.Sequential(*[nn.Linear(input_size+forward_dim, hidden_dim),
+                                       nn.ReLU(),
+                                       nn.BatchNorm1d(hidden_dim),
+                                       nn.Linear(hidden_dim, hidden_dim),
+                                       nn.ReLU()])
+
+
+        self.forward_net = nn.Sequential(*[nn.Linear(forward_dim, 64),
+                                   nn.ReLU(),
+                                   nn.BatchNorm1d(64),
+                                   nn.Linear(64, 64),
+                                   nn.ReLU(),
+                                   nn.BatchNorm1d(64),
+                                   nn.Linear(64, 64),
+                                   nn.ReLU(),
+                                   nn.Linear(64, input_size)])
+        
+        self.mu_head = nn.Linear(hidden_dim, latent_dim)
+        self.logvar_head = nn.Linear(hidden_dim, latent_dim)
+
+        # decoder
+        self.decoder = nn.Sequential(*[nn.Linear(latent_dim + forward_dim, hidden_dim),
+                                       nn.ReLU(),
+                                       nn.BatchNorm1d(hidden_dim),
+                                       nn.Linear(hidden_dim, hidden_dim),
+                                       nn.ReLU(),
+                                       nn.BatchNorm1d(hidden_dim),
+                                       nn.Linear(hidden_dim, input_size)])
+
+    def encode(self, x):
+        h = self.encoder(x)
+        return self.mu_head(h), self.logvar_head(h)
+
+    def reparameterize(self, mu, logvar):
+        std = torch.exp(0.5*logvar)
+        eps = torch.randn_like(std)
+        return mu + eps*std
+
+    def decode(self, z, y):
+        temp = torch.cat((z,y), dim=1)
+        recon_x = self.decoder(torch.cat((z, y), dim=1))
+        return recon_x
+
+    def forward(self, x, y):
+        x_pred = self.forward_net(y)
+        h = self.encoder(torch.cat((x, y), dim=1))
+
+        mu, logvar = self.mu_head(h), self.logvar_head(h)
+        z = self.reparameterize(mu, logvar)
+        
+        return self.decode(z, y), mu, logvar, x_pred
+    
+    def inference(self, y):
+        x = self.forward_net(y)
+        h = self.encoder(torch.cat((x, y), dim=1))
+        mu, logvar = self.mu_head(h), self.logvar_head(h)
+        z = self.reparameterize(mu, logvar)
+
+        return self.decode(z, y), mu, logvar, x
+    
+class cVAE_tandem(nn.Module):
+    def __init__(self, input_size, latent_dim, hidden_dim=256, forward_dim=3):
+        super(cVAE_tandem, self).__init__()
+
+        self.input_size = input_size
+        self.latent_dim = latent_dim
+
+        # encoder
+        self.encoder = nn.Sequential(*[nn.Linear(input_size+forward_dim, hidden_dim),
+                                       nn.ReLU(),
+                                       nn.BatchNorm1d(hidden_dim),
+                                       nn.Linear(hidden_dim, hidden_dim),
+                                       nn.ReLU()])
+
+
+        self.forward_net = nn.Sequential(*[nn.Linear(forward_dim, 64),
+                                   nn.ReLU(),
+                                   nn.BatchNorm1d(64),
+                                   nn.Linear(64, 64),
+                                   nn.ReLU(),
+                                   nn.BatchNorm1d(64),
+                                   nn.Linear(64, 64),
+                                   nn.ReLU(),
+                                   nn.Linear(64, input_size)])
+        
+        self.inverse_net = nn.Sequential(*[nn.Linear(input_size, 64),
+                                   nn.ReLU(),
+                                   nn.BatchNorm1d(64),
+                                   nn.Linear(64, 64),
+                                   nn.ReLU(),
+                                   nn.BatchNorm1d(64),
+                                   nn.Linear(64, 64),
+                                   nn.ReLU(),
+                                   nn.Linear(64, forward_dim)])
+        
+        self.mu_head = nn.Linear(hidden_dim, latent_dim)
+        self.logvar_head = nn.Linear(hidden_dim, latent_dim)
+
+        # decoder
+        self.decoder = nn.Sequential(*[nn.Linear(latent_dim + forward_dim, hidden_dim),
+                                       nn.ReLU(),
+                                       nn.BatchNorm1d(hidden_dim),
+                                       nn.Linear(hidden_dim, hidden_dim),
+                                       nn.ReLU(),
+                                       nn.BatchNorm1d(hidden_dim),
+                                       nn.Linear(hidden_dim, input_size)])
+
+    def encode(self, x):
+        h = self.encoder(x)
+        return self.mu_head(h), self.logvar_head(h)
+
+    def reparameterize(self, mu, logvar):
+        std = torch.exp(0.5*logvar)
+        eps = torch.randn_like(std)
+        return mu + eps*std
+
+    def decode(self, z, y):
+        temp = torch.cat((z,y), dim=1)
+        recon_x = self.decoder(torch.cat((z, y), dim=1))
+        return recon_x
+
+    def forward(self, x, y):
+        x_pred = self.forward_net(y)
+        y_pred= self.inverse_net(x_pred)
+        
+        h = self.encoder(torch.cat((x, y), dim=1))
+
+        mu, logvar = self.mu_head(h), self.logvar_head(h)
+        z = self.reparameterize(mu, logvar)
+        
+        return self.decode(z, y), mu, logvar, x_pred, y_pred
+    
+    def inference(self, y):
+        x = self.forward_net(y)
+        h = self.encoder(torch.cat((x, y), dim=1))
+        mu, logvar = self.mu_head(h), self.logvar_head(h)
+        z = self.reparameterize(mu, logvar)
+
+        return self.decode(z, y), mu, logvar, x
+
+
+class cVAE_new(nn.Module):
+    def __init__(self, input_size, latent_dim, hidden_dim=256, forward_dim=3):
+        super(cVAE_new, self).__init__()
+
+        self.input_size = input_size
+        self.latent_dim = latent_dim
+
+        # encoder
+        self.encoder = nn.Sequential(*[nn.Linear(input_size+forward_dim, hidden_dim),
+                                       nn.ReLU(),
+                                       nn.BatchNorm1d(hidden_dim),
+                                       nn.Linear(hidden_dim, hidden_dim),
+                                       nn.ReLU()])
+
+
+        self.forward_net = nn.Sequential(*[nn.Linear(input_size, 64),
+                                   nn.ReLU(),
+                                   nn.BatchNorm1d(64),
+                                   nn.Linear(64, 64),
+                                   nn.ReLU(),
+                                   nn.BatchNorm1d(64),
+                                   nn.Linear(64, 64),
+                                   nn.ReLU(),
+                                   nn.Linear(64, forward_dim)])
+        
+        self.mu_head = nn.Linear(hidden_dim, latent_dim)
+        self.logvar_head = nn.Linear(hidden_dim, latent_dim)
+
+        # decoder
+        self.decoder = nn.Sequential(*[nn.Linear(latent_dim + forward_dim, hidden_dim),
+                                       nn.ReLU(),
+                                       nn.BatchNorm1d(hidden_dim),
+                                       nn.Linear(hidden_dim, input_size)])
+
+    def encode(self, x):
+        h = self.encoder(x)
+        return self.mu_head(h), self.logvar_head(h)
+
+    def reparameterize(self, mu, logvar):
+        std = torch.exp(0.5*logvar)
+        eps = torch.randn_like(std)
+        return mu + eps*std
+
+    def decode(self, z, y):
+        recon_x = self.decoder(torch.cat((z, y), dim=1))
+        return recon_x
+
+    def forward(self, x, y):
+        y_pred = self.forward_net(x)
+        h = self.encoder(torch.cat((x, y_pred), dim=1))
+
+        mu, logvar = self.mu_head(h), self.logvar_head(h)
+        z = self.reparameterize(mu, logvar)
+
+        return self.decode(z, y), mu, logvar, y_pred
 # conditional GAN
 
 

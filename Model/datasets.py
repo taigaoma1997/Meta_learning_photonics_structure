@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 import pickle as pkl
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler,  MinMaxScaler
 
 import torch
 from torch import nn
@@ -21,7 +21,8 @@ class SiliconColor(Dataset):
             x, y = y, x
         self.data = np.hstack((x, y))
         
-        self.scaler = StandardScaler()
+        #self.scaler = StandardScaler()
+        self.scaler = MinMaxScaler()
         self.scaler.fit(self.data[:6000])
         
         if split is 'train':
@@ -37,6 +38,7 @@ class SiliconColor(Dataset):
             self.x, self.y = self.data[:, :3], self.data[:, 3:]
         else:
             self.x, self.y = self.data[:, :4], self.data[:, 4:]
+            
         
     def __len__(self):
         return len(self.data)
@@ -47,7 +49,7 @@ class SiliconColor(Dataset):
 
 def get_dataloaders(model):
     datapath = 'data\RCWA_xyY_all.mat'
-    if model in ['forward_model', 'vae', 'inn']:
+    if model in ['forward_model', 'vae', 'inn', 'vae_new', 'vae_GSNN', 'vae_Full','vae_tandem', 'vae_hybrid']:
         train_dt = SiliconColor(datapath, 'train')
         val_dt = SiliconColor(datapath, 'val')
         test_dt = SiliconColor(datapath, 'test')
