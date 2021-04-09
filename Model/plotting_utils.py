@@ -46,3 +46,26 @@ def plot_cie_raw_pred(cie_raw, cie_pred):
         ax[i].set_title(titles[i] + ' (r2 score = {:.3f})'.format(r2_score(raw_pred[:, 0], raw_pred[:, 1])))
         ax[i].set_xlabel('ground truth')
         ax[i].set_ylabel('predicted')
+    plt.show()
+    
+
+def plot_struc_raw_pred(cie_raw, cie_pred, a = 1):
+    fig, ax = plt.subplots(1, 4, figsize=(14, 3))
+    titles = ['Height', 'Gap', 'Period','Diamater']
+    xlim = [[0, 210], [150, 330], [280, 720], [75, 165]]
+    for i in range(4):
+        raw_pred = np.array(sorted(zip(cie_raw[:, i], cie_pred[:, i])))
+        ax[i].scatter(raw_pred[:, 0], raw_pred[:, 1])
+        
+        
+        ax[i].set_xlabel('ground truth')
+        ax[i].set_ylabel('predicted')
+        if a==1:
+            ax[i].set_xlim(xlim[i])
+            ax[i].set_ylim(xlim[i])
+            ax[i].plot(xlim[i],xlim[i], c='k')
+            ax[i].set_title(titles[i])
+            ax[i].set_title(titles[i] + ' (r2 score = {:.3f})'.format(r2_score(raw_pred[:, 0], raw_pred[:, 1])))
+            continue
+        ax[i].set_title(titles[i] + ' (r2 score = {:.3f})'.format(r2_score(raw_pred[:, 0], raw_pred[:, 1])))
+    plt.show()

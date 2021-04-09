@@ -5,6 +5,14 @@ import numpy as np
 from torch.nn import functional as F
 from utils import MMD_multiscale
 import matplotlib.pyplot as plt
+from sklearn.metrics import r2_score
+
+from models import MLP, TandemNet, cVAE, cGAN, INN
+from utils import evaluate_simple_inverse, evaluate_tandem_accuracy, evaluate_vae_inverse, evaluate_gan_inverse, evaluate_inn_inverse
+from configs import get_configs
+from plotting_utils import compare_cie_dist, compare_param_dist, plot_cie, plot_cie_raw_pred
+from datasets import get_dataloaders, SiliconColor
+
 
 
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -56,7 +64,12 @@ class Trainer():
             for x, y in dataloader:
 
                 x, y = x.to(DEVICE), y.to(DEVICE)
-                pred = self.model(x, y)
+                if self.model_name == 'vae_GSNN':
+                    pred = self.model(x,y)
+                elif self.model_name == 'vae_Full':
+                    pred = self.model(x,y)
+                else:
+                    pred = self.model(x,y)
                 loss = self.get_loss(x, y, pred)
                 loss_epoch += loss.to('cpu').item() * len(x)
 
@@ -86,6 +99,77 @@ class Trainer():
 
         self.save_checkpoint(e, loss_test)
         print('Saved final trained model.')
+        
+    def fit_inn(self):
+        temp1 = np.zeros([2,self.epochs]);
+        train_loader, val_loader, test_loader = get_dataloaders('tandem_net')
+        for e in range(self.epochs):
+            
+            loss_train = self.train()
+            loss_val = self.evaluate()
+            temp1[0,e] = loss_train
+            temp1[1,e] = loss_val
+            print('Epoch {}, train loss {:.3f}, val loss {:.3f}'.format(
+                e, loss_train, loss_val))
+            if e%50 == 0:
+                plt.plot(range(self.epochs),temp1[0,:],label='Training loss')  
+                plt.plot(range(self.epochs),temp1[1,:],label='Val Loss')                      
+                # plot the training and val loss VS epoches.
+                plt.xlabel('epochs')
+                plt.ylabel('Loss')
+                plt.title('weight_decay: 1e-5 + learning_rate 5e-4 + Epochs %i' %e)
+                plt.ylim([0, 100])
+                plt.xlim([1, e])
+                plt.legend()
+                plt.show()
+                
+                loss_test = self.evaluate(test=True)
+                path_e  = './models/inn_trained_epoch_' + str(e) + '.pth'
+                self.save_checkpoint_e(e, loss_test, path_e)
+                
+                configs = get_configs('inn')
+                model_temp = INN(configs['ndim_total'], configs['input_dim'], configs['output_dim'], dim_z = configs['latent_dim']).to(DEVICE)
+                model_temp.load_state_dict(torch.load(path_e)['model_state_dict'], strict=False)
+                forward_model_temp = MLP(4, 3).to(DEVICE)
+                forward_model_temp.load_state_dict(torch.load('./models/forward_model_trained.pth')['model_state_dict'])
+                cie_raw, param_raw, cie_pred, param_pred = evaluate_inn_inverse(forward_model_temp, model_temp, configs, test_loader.dataset)
+                fig, ax = plt.subplots(1, 3, figsize=(10, 3))
+                titles = ['x', 'y', 'Y']
+                for i in range(3):
+                    raw_pred = np.array(sorted(zip(cie_raw[:, i], cie_pred[:, i])))
+                    ax[i].scatter(raw_pred[:, 0], raw_pred[:, 1])
+                    ax[i].plot([raw_pred[:,0].min(), raw_pred[:,0].max()], [raw_pred[:,1].min(), raw_pred[:,1].max()], c='k')
+                    ax[i].set_title(titles[i] + ' (r2 score = {:.3f})'.format(r2_score(raw_pred[:, 0], raw_pred[:, 1])))
+                    ax[i].set_xlabel('ground truth')
+                    ax[i].set_ylabel('predicted')
+                plt.show()
+                fig.savefig('./models/inn_trained_epoch_' + str(e) + '.png')
+                                
+        
+        plt.plot(range(self.epochs),temp1[0,:],label='Training loss')  
+        plt.plot(range(self.epochs),temp1[1,:],label='Val Loss')                      
+        # plot the training and val loss VS epoches.
+        plt.xlabel('epochs')
+        plt.ylabel('Loss')
+        plt.legend()
+        
+        
+        loss_test = self.evaluate(test=True)
+        print('Training finished! Test loss {:.3f}'.format(loss_test))
+
+        self.save_checkpoint(e, loss_test)
+        print('Saved final trained model.')
+    
+    def save_checkpoint_e(self, epoch, loss, path_e):
+        # torch.save(self.model.state_dict(), './models/'+filename)
+
+        torch.save({
+            'epoch': epoch,
+            'model_state_dict': self.model.state_dict(),
+            'optimizer_state_dict': self.optimizer.state_dict(),
+            'loss': loss,
+        }, path_e)
+        
 
     def save_checkpoint(self, epoch, loss):
         # torch.save(self.model.state_dict(), './models/'+filename)
@@ -128,6 +212,40 @@ class Trainer():
 
             # print(BCE, KLD)
             return recon_loss + KLD + pred_loss
+        elif self.model_name == 'vae_new':
+            recon_x, mu, logvar, y_pred = pred
+            recon_loss = self.criterion(recon_x, x)
+            KLD = -0.5 * torch.mean(1 + logvar - mu.pow(2) - logvar.exp())
+            return recon_loss + KLD
+        
+        elif self.model_name == 'vae_GSNN':
+            recon_x, mu, logvar, x_pred = pred
+            recon_loss = self.criterion(recon_x, x)
+            KLD = -0.5 * torch.mean(1 + logvar - mu.pow(2) - logvar.exp())
+            pred_loss = self.criterion(x_pred, x)
+            return recon_loss + KLD+ pred_loss
+        
+        elif self.model_name == 'vae_Full':
+            recon_x, mu, logvar, y_pred = pred
+            recon_loss = self.criterion(recon_x, x)
+            KLD = -0.5 * torch.mean(1 + logvar - mu.pow(2) - logvar.exp())
+            return recon_loss + KLD
+        elif self.model_name =='vae_tandem':
+            recon_x, mu, logvar, x_pred, y_pred = pred
+            recon_loss = self.criterion(recon_x, x)
+            KLD = -0.5 * torch.mean(1 + logvar - mu.pow(2) - logvar.exp())
+            pred_loss = self.criterion(x_pred, x)+ self.criterion(y_pred, y)
+            return recon_loss + KLD+ pred_loss
+        
+        elif self.model_name =='vae_hybrid':
+            recon_x, mu, logvar, y_pred = pred
+            recon_loss = self.criterion(recon_x, x)
+            
+            KLD = -0.5 * torch.mean(1 + logvar - mu.pow(2) - logvar.exp())
+            pred_loss = self.criterion(y_pred, y)
+            
+            return recon_loss + KLD+5*pred_loss        
+        
         else:
             raise NotImplementedError
 

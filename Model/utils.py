@@ -209,7 +209,7 @@ def evaluate_vae_inverse(forward_model, vae_model, configs, dataset):
         x, y = dataset.x.to(DEVICE), dataset.y.to(DEVICE)
         x_dim = x.size()[1]
 
-        mu, logvar = torch.zeros((len(x), configs['latent_dim'])), torch.zeros((len(x), configs['latent_dim']))
+        mu, logvar = torch.zeros((len(x), configs['latent_dim'])), torch.zeros((len(x), configs['latent_dim']))   #why 0, 0?
         z = vae_model.reparameterize(mu, logvar).to(DEVICE)
         y_pred = vae_model.decode(z, x)
 
@@ -235,6 +235,111 @@ def evaluate_vae_inverse(forward_model, vae_model, configs, dataset):
         print('Reconstruct RMSE loss raw {:.3f}'.format(rmse_cie_raw))
 
     return x_raw.cpu().numpy(), y_raw.cpu().numpy(), x_pred_raw.cpu().numpy(), y_pred_raw.cpu().numpy()
+
+def evaluate_vae_minmax_inverse(forward_model, vae_model, configs, dataset):
+
+    vae_model.eval()
+    with torch.no_grad():
+        range_, min_ = torch.tensor(dataset.scaler.data_range_).to(DEVICE), torch.tensor(dataset.scaler.data_min_).to(DEVICE)
+        x, y = dataset.x.to(DEVICE), dataset.y.to(DEVICE)
+        x_dim = x.size()[1]
+
+        mu, logvar = torch.zeros((len(x), configs['latent_dim'])), torch.zeros((len(x), configs['latent_dim']))
+        z = vae_model.reparameterize(mu, logvar).to(DEVICE)
+        y_pred = vae_model.decode(z, x)
+
+        # get MSE for the design
+        rmse = torch.sqrt((y_pred - y).pow(2).sum(dim=1).mean())
+        print("Simple net Design RMSE loss {:.3f}".format(rmse.item()))
+
+        # get RMSE
+        y_pred_raw = y_pred *range_[x_dim:] +min_[x_dim:]
+        y_raw =  y *range_[x_dim:] +min_[x_dim:]
+        rmse_design_raw = torch.sqrt((y_pred_raw - y_raw).pow(2).sum(dim=1).mean())
+        print('Simple net RMSE loss {:.3f}'.format(rmse_design_raw.item()))
+
+        # get difference between the obtained CIE and the actual target CIE
+        x_pred = forward_model(y_pred, y)
+        rmse_cie = torch.sqrt((x_pred - x).pow(2).sum(dim=1).mean())
+        print('Reconstruct RMSE loss {:.3f}'.format(rmse_cie))
+
+        # compare differnet between the obtained CIE and the actual target CIE in the original space
+        x_pred_raw = x_pred *range_[:x_dim] + min_[:x_dim]
+        x_raw =  x *range_[:x_dim] +min_[:x_dim]        
+        rmse_cie_raw = torch.sqrt((x_pred_raw - x_raw).pow(2).sum(dim=1).mean())
+        print('Reconstruct RMSE loss raw {:.3f}'.format(rmse_cie_raw))
+
+    return x_raw.cpu().numpy(), y_raw.cpu().numpy(), x_pred_raw.cpu().numpy(), y_pred_raw.cpu().numpy()
+
+
+def evaluate_vae_hybrid_minmax_inverse(forward_model, vae_model, configs, dataset):
+
+    vae_model.eval()
+    with torch.no_grad():
+        range_, min_ = torch.tensor(dataset.scaler.data_range_).to(DEVICE), torch.tensor(dataset.scaler.data_min_).to(DEVICE)
+        x, y = dataset.x.to(DEVICE), dataset.y.to(DEVICE)
+        x_dim = x.size()[1]
+
+        mu, logvar = torch.zeros((len(x), configs['latent_dim'])), torch.zeros((len(x), configs['latent_dim']))
+        z = vae_model.vae_model.reparameterize(mu, logvar).to(DEVICE)
+        y_pred = vae_model.vae_model.decode(z, x)
+
+        # get MSE for the design
+        rmse = torch.sqrt((y_pred - y).pow(2).sum(dim=1).mean())
+        print("Simple net Design RMSE loss {:.3f}".format(rmse.item()))
+
+        # get RMSE
+        y_pred_raw = y_pred *range_[x_dim:] +min_[x_dim:]
+        y_raw =  y *range_[x_dim:] +min_[x_dim:]
+        rmse_design_raw = torch.sqrt((y_pred_raw - y_raw).pow(2).sum(dim=1).mean())
+        print('Simple net RMSE loss {:.3f}'.format(rmse_design_raw.item()))
+
+        # get difference between the obtained CIE and the actual target CIE
+        x_pred = forward_model(y_pred, y)
+        rmse_cie = torch.sqrt((x_pred - x).pow(2).sum(dim=1).mean())
+        print('Reconstruct RMSE loss {:.3f}'.format(rmse_cie))
+
+        # compare differnet between the obtained CIE and the actual target CIE in the original space
+        x_pred_raw = x_pred *range_[:x_dim] + min_[:x_dim]
+        x_raw =  x *range_[:x_dim] +min_[:x_dim]        
+        rmse_cie_raw = torch.sqrt((x_pred_raw - x_raw).pow(2).sum(dim=1).mean())
+        print('Reconstruct RMSE loss raw {:.3f}'.format(rmse_cie_raw))
+
+    return x_raw.cpu().numpy(), y_raw.cpu().numpy(), x_pred_raw.cpu().numpy(), y_pred_raw.cpu().numpy()
+
+def evaluate_vae_minmax_GSNN_inverse(forward_model, vae_model, configs, dataset):
+
+    vae_model.eval()
+    with torch.no_grad():
+        range_, min_ = torch.tensor(dataset.scaler.data_range_).to(DEVICE), torch.tensor(dataset.scaler.data_min_).to(DEVICE)
+        x, y = dataset.x.to(DEVICE), dataset.y.to(DEVICE)
+        x_dim = x.size()[1]
+
+        y_pred, mu, logvar, temp = vae_model.inference(x)
+
+        # get MSE for the design
+        rmse = torch.sqrt((y_pred - y).pow(2).sum(dim=1).mean())
+        print("Simple net Design RMSE loss {:.3f}".format(rmse.item()))
+
+        # get RMSE
+        y_pred_raw = y_pred *range_[x_dim:] +min_[x_dim:]
+        y_raw =  y *range_[x_dim:] +min_[x_dim:]
+        rmse_design_raw = torch.sqrt((y_pred_raw - y_raw).pow(2).sum(dim=1).mean())
+        print('Simple net RMSE loss {:.3f}'.format(rmse_design_raw.item()))
+
+        # get difference between the obtained CIE and the actual target CIE
+        x_pred = forward_model(y_pred, y)
+        rmse_cie = torch.sqrt((x_pred - x).pow(2).sum(dim=1).mean())
+        print('Reconstruct RMSE loss {:.3f}'.format(rmse_cie))
+
+        # compare differnet between the obtained CIE and the actual target CIE in the original space
+        x_pred_raw = x_pred *range_[:x_dim] + min_[:x_dim]
+        x_raw =  x *range_[:x_dim] +min_[:x_dim]        
+        rmse_cie_raw = torch.sqrt((x_pred_raw - x_raw).pow(2).sum(dim=1).mean())
+        print('Reconstruct RMSE loss raw {:.3f}'.format(rmse_cie_raw))
+
+    return x_raw.cpu().numpy(), y_raw.cpu().numpy(), x_pred_raw.cpu().numpy(), y_pred_raw.cpu().numpy()
+
 
 def evaluate_gan_inverse(forward_model, gan_model, configs, dataset):
 
@@ -271,7 +376,7 @@ def evaluate_gan_inverse(forward_model, gan_model, configs, dataset):
     return x_raw.cpu().numpy(), y_raw.cpu().numpy(), x_pred_raw.cpu().numpy(), y_pred_raw.cpu().numpy()
 
 
-def evaluate_inn_inverse(forward_model, model, configs, dataset):
+def evaluate_inn_inverse(forward_model, model, configs, dataset, show = 1):
     '''
     The dataset need to be in inverse format, i.e., x corresponds to target while y corresponds to design.
     '''
@@ -309,26 +414,53 @@ def evaluate_inn_inverse(forward_model, model, configs, dataset):
 
         # get MSE for the design
         rmse = torch.sqrt((y_pred - y).pow(2).sum(dim=1).mean())
-        print("Simple net Design RMSE loss {:.3f}".format(rmse.item()))
+        if show==1:
+            print("Simple net Design RMSE loss {:.3f}".format(rmse.item()))
 
         # get RMSE
         y_pred_raw = y_pred * std[x_dim:] + mean[x_dim:]
         y_raw= y * std[x_dim:] + mean[x_dim:]
         rmse_design_raw = torch.sqrt((y_pred_raw - y_raw).pow(2).sum(dim=1).mean())
-        print('Simple net RMSE loss {:.3f}'.format(rmse_design_raw.item()))
+        if show==1:
+            print('Simple net RMSE loss {:.3f}'.format(rmse_design_raw.item()))
 
         # get difference between the obtained CIE and the actual target CIE
         x_pred = forward_model(y_pred, y)
         rmse_cie = torch.sqrt((x_pred - x).pow(2).sum(dim=1).mean())
-        print('Reconstruct RMSE loss {:.3f}'.format(rmse_cie))
+        if show==1:
+            print('Reconstruct RMSE loss {:.3f}'.format(rmse_cie))
 
         # compare differnet between the obtained CIE and the actual target CIE in the original space
         x_pred_raw = x_pred * std[:x_dim] + mean[:x_dim]
         x_raw = x * std[:x_dim] + mean[:x_dim]
         rmse_cie_raw = torch.sqrt((x_pred_raw - x_raw).pow(2).sum(dim=1).mean())
-        print('Reconstruct RMSE loss raw {:.3f}'.format(rmse_cie_raw))
+        if show==1:
+            print('Reconstruct RMSE loss raw {:.3f}'.format(rmse_cie_raw))
 
     return x_raw.cpu().numpy(), y_raw.cpu().numpy(), x_pred_raw.cpu().numpy(), y_pred_raw.cpu().numpy()
+
+def evaluate_forward(forward_model, dataset, param_pred):
+    '''
+    The dataset need to be in inverse format, i.e., x corresponds to target while y corresponds to design.
+    '''
+
+    mean, std = torch.tensor(dataset.scaler.mean_).to(DEVICE), torch.tensor(np.sqrt(dataset.scaler.var_)).to(DEVICE)
+    N = np.shape(param_pred)[0]
+    param_pred = np.reshape(param_pred, (-1, 4))
+    
+    with torch.no_grad():
+        x, y = dataset.x.to(DEVICE), dataset.y.to(DEVICE)
+        x_dim = x.size()[1]
+        M = np.shape(param_pred)[0]
+        param_cie = np.zeros([M, 3])
+        param_y_cie = np.concatenate((param_cie, param_pred), axis=1)
+        y_pred = dataset.scaler.transform(param_y_cie)[:, 3:7]
+
+        x_pred = forward_model(torch.tensor(y_pred).float(), y)
+        x_pred_raw = x_pred * std[:x_dim] + mean[:x_dim]
+        
+    x_pred_raw = x_pred_raw.cpu().numpy()
+    return  np.reshape(x_pred_raw, (N, -1))
 
 
 def count_params(model):
