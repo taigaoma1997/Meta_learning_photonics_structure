@@ -1,6 +1,6 @@
-%% so far we only need to simulate for models: vae_Full, vae_hybrid, vae_GSNN
+%% so far we only need to simulate for models: vae_Full, vae_hybrid, vae_GSNN, vae_tandem
 
-model = 'vae_GSNN';  
+model = 'tandem';  
 filename = strcat('data_predicted\param_', model, '_pred.mat');
 filename_save = strcat('data_predicted\spectrum\spectrum_param_', model, '_pred.mat');
 load(filename);
@@ -11,13 +11,22 @@ N = size(param_pred,2);
 if isfile(filename_save)==0
     param_pred_re = param_pred.';
     param_pred_re = reshape(param_pred_re, 4,[]);
-    param_pred_re = param_pred_re.';
+    param_pred_re = param_pred_re.';  % this part is useful when the the predicted structure has multiple structures 
 
     param_pred_re = param_pred(:,1:4);
     START = 1;
     END = M;
     CURRENT = 1;
+else
+    load(filename_save);
+    param_pred_re = param_pred.';
+    param_pred_re = reshape(param_pred_re, 4,[]);
+    param_pred_re = param_pred_re.';
+
+    param_pred_re = param_pred(:,1:4);
 end
+
+
 
 acc = 10;
 stepcase = 5;
@@ -31,6 +40,7 @@ else
 refls = RCWA_Silicon(param_pred_re(i,1), param_pred_re(i,2), param_pred_re(i,3), param_pred_re(i,4), acc, show1,stepcase);
     spectrum(i,:) = refls;
     CURRENT = i;
+    spectrum = spectrum(1:CURRENT,:);
     save(filename_save,'spectrum', 'START','END', 'CURRENT');
     i
     toc
@@ -38,20 +48,8 @@ refls = RCWA_Silicon(param_pred_re(i,1), param_pred_re(i,2), param_pred_re(i,3),
 end
 
 fprintf('Simulation done! \n');
-        
-%% Load data 
+
 wave = 380:5:780;
-model = 'vae_hybrid';  
-filename = strcat('data_predicted\param_', model, '_pred.mat');
-filename_save = strcat('data_predicted\spectrum\spectrum_param_', model, '_pred.mat');
-
-load(filename);
-load(filename_save);
-param_pred_re = param_pred.';
-param_pred_re = reshape(param_pred_re, 4,[]);
-param_pred_re = param_pred_re.';
-param_pred_re = param_pred(:,1:4);
-
 figure(10)
 plot(wave, spectrum)
 axis([380 780 0 1]);
@@ -71,6 +69,7 @@ xyY = xyz;
 xyY(:,3) = XYZ(:,2);
 
 %% Save data 
+
 xyY_pred = xyY;
 filename_save_xyY = strcat('data_predicted\xyY\xyY_param_', model, '_pred.mat');
 save(filename_save_xyY, 'param_test','param_pred','CIE_x','xyY_pred','cie_pred');
