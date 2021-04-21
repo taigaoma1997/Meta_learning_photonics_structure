@@ -1,4 +1,4 @@
-filepath ="data_predicted/xyY/xyY_param_vae_hybrid_pred.mat"import torch
+import torch
 from torch import nn
 from torch.nn import functional as F
 from torch.utils.data import Dataset, DataLoader
@@ -12,18 +12,21 @@ class MLP(nn.Module):
     def __init__(self, input_size, output_size):
         super(MLP, self).__init__()
         '''
-        layer_sizes: list of input sizes
+        layer_sizes: list of input sizes: forward/inverse model: 4 layers with 320 nodes in each layer
         '''
 
-        self.net = nn.Sequential(*[nn.Linear(input_size, 64),
+        self.net = nn.Sequential(*[nn.Linear(input_size, 320),
                                    nn.ReLU(),
-                                   nn.BatchNorm1d(64),
-                                   nn.Linear(64, 64),
+                                   #nn.BatchNorm1d(320),
+                                   nn.Linear(320, 320),
                                    nn.ReLU(),
-                                   nn.BatchNorm1d(64),
-                                   nn.Linear(64, 64),
+                                   #nn.BatchNorm1d(320),
+                                   nn.Linear(320, 320),
                                    nn.ReLU(),
-                                   nn.Linear(64, output_size)])
+                                   #nn.BatchNorm1d(320),
+                                   nn.Linear(320, 320),
+                                   nn.ReLU(),
+                                   nn.Linear(320, output_size)])
 
     def forward(self, x, y):
         return self.net(x)
@@ -37,17 +40,19 @@ class TandemNet(nn.Module):
         self.inverse_model = inverse_model
 
     def forward(self, x, y):
+        # x: structure, y: CIE coordinate out: cie
         '''
         Pass the desired target x to the tandem network.
         '''
 
-        pred = self.inverse_model(x, y)
-        out = self.forward_model(pred, None)
+        pred = self.inverse_model(y, x)
+        out = self.forward_model(pred, x)
 
         return out
 
-    def pred(self, x):
-        pred = self.inverse_model(x, None)
+    def pred(self, y):
+        pred = self.inverse_model(y, None)
+        # pred : structure
         return pred
 
 
@@ -151,7 +156,7 @@ class cVAE_Full(nn.Module):
     
     def inference(self, y):
         
-        mu, logvar = torch.randn([y.size()[0], self.latent_dim]), torch.randn([y.size()[0], self.latent_dim])
+        mu, logvar = torch.zeros([y.size()[0], self.latent_dim]), torch.zeros([y.size()[0], self.latent_dim])
         z = self.reparameterize(mu, logvar)
         return self.decode(z, y), mu, logvar, y
 
@@ -164,18 +169,19 @@ class cVAE_hybrid(nn.Module):
         self.vae_model = vae_model
 
     def forward(self, x, y):
+        # the prediction is based on cVAE_GSNN model
         '''
         Pass the desired target x to the vae_hybrid network.
         '''
         
-        x_pred, mu, logvar, y_pre = self.vae_model(x, y)
-        y_pred = self.pred(x_pred)
-        return x_pred, mu, logvar, y_pred 
+        x_pred, mu, logvar, x_hat = self.vae_model(x, y)
+        
+        y_pred = self.forward_model(x_pred, None)
+        return x_pred, mu, logvar, x_hat, y_pred 
 
     def pred(self, x):
         pred = self.forward_model(x, None)
         return pred
-
 
 
 class cVAE_GSNN(nn.Module):
@@ -230,13 +236,13 @@ class cVAE_GSNN(nn.Module):
         return recon_x
 
     def forward(self, x, y):
-        x_pred = self.forward_net(y)
+        x_hat = self.forward_net(y)
         h = self.encoder(torch.cat((x, y), dim=1))
 
         mu, logvar = self.mu_head(h), self.logvar_head(h)
         z = self.reparameterize(mu, logvar)
         
-        return self.decode(z, y), mu, logvar, x_pred
+        return self.decode(z, y), mu, logvar, x_hat
     
     def inference(self, y):
         x = self.forward_net(y)
@@ -246,6 +252,7 @@ class cVAE_GSNN(nn.Module):
 
         return self.decode(z, y), mu, logvar, x
     
+
 class cVAE_tandem(nn.Module):
     def __init__(self, input_size, latent_dim, hidden_dim=256, forward_dim=3):
         super(cVAE_tandem, self).__init__()

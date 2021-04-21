@@ -11,7 +11,7 @@ def get_configs(experiment):
         {'model_name': 'forward_model',
          'input_dim': 4,
          'output_dim': 3,
-         'epochs': 100,   # 100 before
+         'epochs': 500,   # 100 before
          'weight_decay': 1e-5,
          'learning_rate': 1e-3},
 
@@ -19,7 +19,7 @@ def get_configs(experiment):
         {'model_name': 'inverse_net',
          'input_dim': 3,
          'output_dim': 4,
-         'epochs': 60,
+         'epochs': 500,
          'weight_decay': 1e-5,
          'learning_rate': 1e-3},
 
@@ -27,7 +27,7 @@ def get_configs(experiment):
         {'model_name': 'tandem_net',
          'input_dim': 3,
          'output_dim': 3,
-         'epochs': 300,
+         'epochs': 500,
          'weight_decay': 1e-5,
          'learning_rate': 1e-3},
 
@@ -41,7 +41,7 @@ def get_configs(experiment):
          'learning_rate': 1e-3},
         
         'vae_new':
-        {'model_name': 'vae',
+        {'model_name': 'vae_new',
          'input_dim': 4,
          'latent_dim': 5,
          #'latent_dim': 3,
@@ -50,7 +50,7 @@ def get_configs(experiment):
          'learning_rate': 1e-3},
         
         'vae_GSNN':
-        {'model_name': 'vae',
+        {'model_name': 'vae_GSNN',
          'input_dim': 4,
          'latent_dim': 4,
          #'latent_dim': 3,
@@ -59,7 +59,7 @@ def get_configs(experiment):
          'learning_rate': 1e-3},
         
         'vae_Full':
-        {'model_name': 'vae',
+        {'model_name': 'vae_Full',
          'input_dim': 4,
          'latent_dim': 5,
          #'latent_dim': 3,
@@ -77,9 +77,9 @@ def get_configs(experiment):
          'learning_rate': 1e-3},
 
         'vae_hybrid':
-        {'model_name': 'vae',
+        {'model_name': 'vae_hybrid',
          'input_dim': 4,
-         'latent_dim': 5,
+         'latent_dim': 4,
          #'latent_dim': 3,
          'epochs': 500,
          'weight_decay': 1e-5,
@@ -98,7 +98,7 @@ def get_configs(experiment):
          'd_learning_rate': 1e-7},
 
         'vae_new_1':
-        {'model_name': 'vae',
+        {'model_name': 'vae_new_1',
          'input_dim': 7,
          'latent_dim': 5,
          #'latent_dim': 3,

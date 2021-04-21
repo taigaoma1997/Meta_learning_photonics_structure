@@ -69,3 +69,29 @@ def plot_struc_raw_pred(cie_raw, cie_pred, a = 1):
             continue
         ax[i].set_title(titles[i] + ' (r2 score = {:.3f})'.format(r2_score(raw_pred[:, 0], raw_pred[:, 1])))
     plt.show()
+    
+def plt_abs_err(CIE_x, cie_pred):
+    abs_err = abs(CIE_x - cie_pred)
+    abs_mean = sum(abs_err)/len(abs_err)
+    
+    plt.figure(figsize = [8, 7])
+    plt.subplot(3,1 ,1)
+    plt.scatter(CIE_x[:,0],abs_err[:,0], color='r',label='x')
+    plt.axhline(y=abs_mean[0],color='r', linestyle='-')
+    plt.text(0.5,abs_mean[0] , str(round(abs_mean[0],4)), bbox=dict(facecolor='w', alpha=0.5))
+    plt.ylabel('Abs error')
+    plt.legend()
+    
+    plt.subplot(3,1,2)
+    plt.scatter(CIE_x[:,1],abs_err[:,1], color='g',label='y')
+    plt.axhline(y=abs_mean[1], color='g',linestyle='-')
+    plt.text(0.6,abs_mean[1] , str(round(abs_mean[1],4)), bbox=dict(facecolor='w', alpha=0.5))
+    plt.ylabel('Abs error')
+    plt.legend()
+    
+    plt.subplot(3,1, 3)
+    plt.scatter(CIE_x[:,2],abs_err[:,2], color='b',label='Y')
+    plt.axhline(y=abs_mean[2], color='b',linestyle='-')
+    plt.text(0.6,abs_mean[2] , str(round(abs_mean[2],4)), bbox=dict(facecolor='w', alpha=0.5))
+    plt.ylabel('Abs error')
+    plt.legend()
