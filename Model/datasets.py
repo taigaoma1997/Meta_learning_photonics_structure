@@ -8,7 +8,7 @@ from torch import nn
 from torch.utils.data import Dataset, DataLoader
 import scipy.io     # used to load .mat data
 
-        if inverse:
+        
 class SiliconColor(Dataset):
     
     def __init__(self, filepath, split='train', inverse=False):
@@ -18,6 +18,7 @@ class SiliconColor(Dataset):
         
         x = self.data[:,:4]
         y = self.data[:,4:]
+        if inverse:
             x, y = y, x
         self.data = np.hstack((x, y))
         
@@ -59,9 +60,9 @@ def get_dataloaders(model):
         val_dt = SiliconColor(datapath, 'val', inverse = True)
         test_dt = SiliconColor(datapath, 'test', inverse = True)
         
-    train_loader = DataLoader(train_dt, batch_size=128, shuffle=True)
-    val_loader = DataLoader(val_dt, batch_size=128, shuffle=False)
-    test_loader = DataLoader(test_dt, batch_size=128, shuffle=False)
+    train_loader = DataLoader(train_dt, batch_size=10, shuffle=True)
+    val_loader = DataLoader(val_dt, batch_size=10, shuffle=False)
+    test_loader = DataLoader(test_dt, batch_size=10, shuffle=False)
 
     return train_loader, val_loader, test_loader
 
