@@ -8,7 +8,7 @@ load(filename);
 M = size(param_pred,1);
 N = size(param_pred,2);
 
-parpool('local', 85)  
+parpool('local', 85)  % set up the total number of parallel computing cpu cores
 
 if isfile(filename_save)==0
     param_pred_re = param_pred.';
@@ -50,6 +50,7 @@ refls = RCWA_Silicon(param_pred_re(i,1), param_pred_re(i,2), param_pred_re(i,3),
 end
 
 fprintf('Simulation done! \n');
+
 delete(gcp('nocreate')); % close the parallel computing
 
 
