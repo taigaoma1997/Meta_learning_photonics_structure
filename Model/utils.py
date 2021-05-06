@@ -476,7 +476,7 @@ def evaluate_forward_minmax(forward_model, dataset, param_pred):
         param = np.concatenate((param_pred, param_cie), axis=1)
         x_pred = dataset.scaler.transform(param)[:, :x_dim]
 
-        y_pred = forward_model(torch.tensor(x_pred).float(), None)
+        y_pred = forward_model(torch.tensor(x_pred).float().to(DEVICE), None)
         y_pred_raw = y_pred *range_[x_dim:] + min_[x_dim:]
         
     y_pred_raw = y_pred_raw.cpu().numpy()
@@ -568,6 +568,47 @@ def evaluate_vae_GSNN_minmax_inverse(vae_GSNN_model, forward_model, dataset, sho
 
     return y_raw.cpu().numpy(), x_raw.cpu().numpy(), y_pred_raw.cpu().numpy(), x_pred_raw.cpu().numpy()
 
+def evaluate_gan_minmax_inverse(gan_model, forward_model, dataset, show=1):
+    # evaluate both the gan model using a forward model
+    # y: structure. x: CIE
+
+    '''
+    returns:
+        x_raw: original desired xyY
+        x_raw_pred: xyY predicted by the forward module for the inversely designed structure
+        y_raw: original structure parameters
+        y_raw_pred: inversely designed parameters.
+    '''
+
+    gan_model.eval()
+    with torch.no_grad():
+        range_, min_ = torch.tensor(dataset.scaler.data_range_).to(DEVICE), torch.tensor(dataset.scaler.data_min_).to(DEVICE)
+        x, y = dataset.x.to(DEVICE), dataset.y.to(DEVICE)
+        x_dim = x.size()[1]
+
+        z = gan_model.sample_noise(len(x)).to(DEVICE)
+        y_pred = gan_model.generator(x, z)
+        x_pred = forward_model(y_pred, None)
+
+        x_pred_raw = x_pred *range_[:x_dim] + min_[:x_dim]
+        x_raw =  x *range_[:x_dim] +min_[:x_dim] 
+        
+        y_pred_raw = y_pred *range_[x_dim:] +min_[x_dim:]
+        y_raw =  y *range_[x_dim:] +min_[x_dim:]
+
+        # get MSE for the design
+        rmse_design = torch.sqrt((y_pred - y).pow(2).sum(dim=1).mean())
+        rmse_design_raw = torch.sqrt((y_pred_raw - y_raw).pow(2).sum(dim=1).mean())
+        rmse_cie = torch.sqrt((x_pred - x).pow(2).sum(dim=1).mean())
+        rmse_cie_raw = torch.sqrt((x_pred_raw - x_raw).pow(2).sum(dim=1).mean())
+
+        if show==1:
+            print("Tandem net Design RMSE loss {:.3f}".format(rmse_design.item()))
+            print('Tandem Design RMSE raw loss {:.3f}'.format(rmse_design_raw.item()))
+            print('Reconstruct net RMSE loss {:.3f}'.format(rmse_cie))
+            print('Reconstruct RMSE loss raw {:.3f}'.format(rmse_cie_raw))
+
+    return x_raw.cpu().numpy(), y_raw.cpu().numpy(), x_pred_raw.cpu().numpy(), y_pred_raw.cpu().numpy()
 
 def evaluate_gan_inverse(forward_model, gan_model, configs, dataset):
 

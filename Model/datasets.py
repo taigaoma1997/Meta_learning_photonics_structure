@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import pickle as pkl
+import os
 from sklearn.preprocessing import StandardScaler,  MinMaxScaler
 
 import torch
@@ -48,8 +49,10 @@ class SiliconColor(Dataset):
         return self.x[idx], self.y[idx]
 
 
-def get_dataloaders(model):
-    datapath = 'data\RCWA_xyY_all.mat'
+def get_dataloaders(model, batch_=128):
+    parentpath = os.getcwd()
+    #datapath = parentpath + '/Meta_learning_photonics_structure/Model/data/RCWA_xyY_all.mat'
+    datapath = './data/RCWA_xyY_all.mat'
     if model in ['forward_model', 'tandem_net','vae', 'inn', 'vae_new', 'vae_GSNN', 'vae_Full','vae_tandem', 'vae_hybrid']:
         train_dt = SiliconColor(datapath, 'train')
         val_dt = SiliconColor(datapath, 'val')
@@ -60,9 +63,9 @@ def get_dataloaders(model):
         val_dt = SiliconColor(datapath, 'val', inverse = True)
         test_dt = SiliconColor(datapath, 'test', inverse = True)
         
-    train_loader = DataLoader(train_dt, batch_size=10, shuffle=True)
-    val_loader = DataLoader(val_dt, batch_size=10, shuffle=False)
-    test_loader = DataLoader(test_dt, batch_size=10, shuffle=False)
+    train_loader = DataLoader(train_dt, batch_size=batch_, shuffle=True)
+    val_loader = DataLoader(val_dt, batch_size=batch_, shuffle=False)
+    test_loader = DataLoader(test_dt, batch_size=batch_, shuffle=False)
 
     return train_loader, val_loader, test_loader
 

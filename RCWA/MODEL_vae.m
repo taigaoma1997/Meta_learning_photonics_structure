@@ -1,12 +1,14 @@
 %% so far we only need to simulate for models: vae_Full, vae_hybrid, vae_GSNN, vae_tandem
 
-model = 'tandem';  
-filename = strcat('data_predicted\param_', model, '_pred.mat');
-filename_save = strcat('data_predicted\spectrum\spectrum_param_', model, '_pred.mat');
+model = 'vae_hybrid_GSNN1_1';  
+filename = strcat('./data_predicted/param_', model, '_pred.mat');
+filename_save = strcat('./data_predicted/spectrum/spectrum_param_', model, '_pred.mat');
 load(filename);
 
 M = size(param_pred,1);
 N = size(param_pred,2);
+
+parpool('local', 85)  
 
 if isfile(filename_save)==0
     param_pred_re = param_pred.';
@@ -48,6 +50,8 @@ refls = RCWA_Silicon(param_pred_re(i,1), param_pred_re(i,2), param_pred_re(i,3),
 end
 
 fprintf('Simulation done! \n');
+delete(gcp('nocreate')); % close the parallel computing
+
 
 wave = 380:5:780;
 figure(10)
@@ -58,8 +62,8 @@ ylabel('Reflection');
 
 %% This part is to transform spectrum data into xyY data and save them
 
-CIE =  importdata('color\cie-cmf.txt');
-load('color\D65.mat');
+CIE =  importdata('./color/cie-cmf.txt');
+load('./color/D65.mat');
 
 K = D65 * CIE(:,3)/100;   % a normalization constant
 temp = transpose(CIE(:,2:4)).*D65/100; 
@@ -71,5 +75,5 @@ xyY(:,3) = XYZ(:,2);
 %% Save data 
 
 xyY_pred = xyY;
-filename_save_xyY = strcat('data_predicted\xyY\xyY_param_', model, '_pred.mat');
+filename_save_xyY = strcat('./data_predicted/xyY/xyY_param_', model, '_pred.mat');
 save(filename_save_xyY, 'param_test','param_pred','CIE_x','xyY_pred','cie_pred');

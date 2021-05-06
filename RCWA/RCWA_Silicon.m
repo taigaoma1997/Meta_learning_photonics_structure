@@ -5,12 +5,12 @@ function refls= RCWA_Silicon(height,gap,period,diameter,acc, show1,stepcase)
     radius=diameter/2;
     medium=0;
     shape=0;
-    addpath('RCWA\RETICOLO V8\reticolo_allege');
+    addpath('./RCWA/RETICOLO V8/reticolo_allege');
     
     %load('RCWA\poly_Si.mat');
     %load('RCWA\Si3N4.mat');
-    SiN = load('RCWA\Si3N4_new.mat');
-    Si = load('RCWA\Si.mat');
+    SiN = load('./RCWA/Si3N4_new.mat');
+    Si = load('./RCWA/Si.mat');
     WL = Si.WL;
     R = Si.R;
     I = Si.I;
@@ -18,7 +18,9 @@ function refls= RCWA_Silicon(height,gap,period,diameter,acc, show1,stepcase)
     R_SiN = SiN.R_SiN;   
     % for setting up the parallel computing 
     
-    parfor i =1:1:81
+
+
+    parfor (i =1:1:81)
         wavelength=wave(i);
         [prv,vmax]=retio([],inf*1i); % never write on the disc (nod to do retio)
         n_Si = interp1(WL, R, wavelength)+1i*interp1(WL, I, wavelength);
@@ -66,3 +68,4 @@ function refls= RCWA_Silicon(height,gap,period,diameter,acc, show1,stepcase)
     end
     %save('refls.mat','refls');
 end
+

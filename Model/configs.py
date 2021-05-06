@@ -11,9 +11,9 @@ def get_configs(experiment):
         {'model_name': 'forward_model',
          'input_dim': 4,
          'output_dim': 3,
-         'epochs': 500,   # 100 before
+         'epochs': 5000,   
          'weight_decay': 1e-5,
-         'learning_rate': 1e-3},
+         'learning_rate': 2e-4},
 
         'inverse_model':
         {'model_name': 'inverse_net',
@@ -27,7 +27,7 @@ def get_configs(experiment):
         {'model_name': 'tandem_net',
          'input_dim': 3,
          'output_dim': 3,
-         'epochs': 500,
+         'epochs': 5000,
          'weight_decay': 1e-5,
          'learning_rate': 1e-3},
 
@@ -81,7 +81,7 @@ def get_configs(experiment):
          'input_dim': 4,
          'latent_dim': 4,
          #'latent_dim': 3,
-         'epochs': 500,
+         'epochs': 5000,
          'weight_decay': 1e-5,
          'learning_rate': 1e-3},
         
@@ -91,11 +91,13 @@ def get_configs(experiment):
          'input_dim': 3,
          'hidden_dim': 128,
          'output_dim': 4,
-         'noise_dim': 1,
-         'epochs': 5000,
+         'noise_dim': 2,
+         'epochs': 50000,
+         'n_critic': 5,
+         'clip_value': 1,
          'weight_decay': 1e-5,
-         'g_learning_rate': 1e-6,
-         'd_learning_rate': 1e-7},
+         'g_learning_rate': 1e-4,
+         'd_learning_rate': 5e-6},
 
         'vae_new_1':
         {'model_name': 'vae_new_1',

@@ -9,6 +9,28 @@ from FrEIA.modules import GLOWCouplingBlock, PermuteRandom
 
 class MLP(nn.Module):
 
+    def __init__(self, input_size, output_size, hidden_dim=64):
+        super(MLP, self).__init__()
+        '''
+        layer_sizes: list of input sizes: forward/inverse model: 4 layers with 320 nodes in each layer
+        '''
+
+        self.net = nn.Sequential(*[nn.Linear(input_size, hidden_dim),
+                                   nn.ReLU(),
+                                   nn.BatchNorm1d(hidden_dim),
+                                   nn.Linear(hidden_dim, hidden_dim),
+                                   nn.ReLU(),
+                                   nn.BatchNorm1d(hidden_dim),
+                                   nn.Linear(hidden_dim, hidden_dim),
+                                   nn.ReLU(),
+                                   nn.BatchNorm1d(hidden_dim),
+                                   nn.Linear(hidden_dim, output_size)])
+
+    def forward(self, x, y):
+        return self.net(x)
+
+class MLP_deep(nn.Module):
+
     def __init__(self, input_size, output_size):
         super(MLP, self).__init__()
         '''
@@ -30,7 +52,6 @@ class MLP(nn.Module):
 
     def forward(self, x, y):
         return self.net(x)
-
 
 class TandemNet(nn.Module):
 
@@ -252,6 +273,82 @@ class cVAE_GSNN(nn.Module):
 
         return self.decode(z, y), mu, logvar, x
     
+class cVAE_GSNN1(nn.Module):
+    # a deeper but narrow network
+    def __init__(self, input_size, latent_dim, hidden_dim=64, forward_dim=3):
+        super(cVAE_GSNN1, self).__init__()
+
+        self.input_size = input_size
+        self.latent_dim = latent_dim
+
+        # encoder
+        self.encoder = nn.Sequential(*[nn.Linear(input_size+forward_dim, hidden_dim),
+                                       nn.ReLU(),
+                                       nn.BatchNorm1d(hidden_dim),
+                                       nn.Linear(hidden_dim, hidden_dim),
+                                       nn.ReLU(),
+                                       nn.BatchNorm1d(hidden_dim),
+                                       nn.Linear(hidden_dim, hidden_dim),
+                                       nn.ReLU(),
+                                       nn.BatchNorm1d(hidden_dim)])
+
+
+        self.forward_net = nn.Sequential(*[nn.Linear(forward_dim, hidden_dim),
+                                   nn.ReLU(),
+                                   nn.BatchNorm1d(hidden_dim),
+                                   nn.Linear(hidden_dim, hidden_dim),
+                                   nn.ReLU(),
+                                   nn.BatchNorm1d(hidden_dim),
+                                   nn.Linear(hidden_dim, hidden_dim),
+                                   nn.ReLU(),
+                                   nn.Linear(hidden_dim, input_size)])
+        
+        self.mu_head = nn.Linear(hidden_dim, latent_dim)
+        self.logvar_head = nn.Linear(hidden_dim, latent_dim)
+
+        # decoder
+        self.decoder = nn.Sequential(*[nn.Linear(latent_dim + forward_dim, hidden_dim),
+                                       nn.ReLU(),
+                                       nn.BatchNorm1d(hidden_dim),
+                                       nn.Linear(hidden_dim, hidden_dim),
+                                       nn.ReLU(),
+                                       nn.BatchNorm1d(hidden_dim),
+                                       nn.Linear(hidden_dim, hidden_dim),
+                                       nn.ReLU(),
+                                       nn.BatchNorm1d(hidden_dim),
+                                       nn.Linear(hidden_dim, input_size)])
+
+    def encode(self, x):
+        h = self.encoder(x)
+        return self.mu_head(h), self.logvar_head(h)
+
+    def reparameterize(self, mu, logvar):
+        std = torch.exp(0.5*logvar)
+        eps = torch.randn_like(std)
+        return mu + eps*std
+
+    def decode(self, z, y):
+        temp = torch.cat((z,y), dim=1)
+        recon_x = self.decoder(torch.cat((z, y), dim=1))
+        return recon_x
+
+    def forward(self, x, y):
+        x_hat = self.forward_net(y)
+        h = self.encoder(torch.cat((x, y), dim=1))
+
+        mu, logvar = self.mu_head(h), self.logvar_head(h)
+        z = self.reparameterize(mu, logvar)
+        
+        return self.decode(z, y), mu, logvar, x_hat
+    
+    def inference(self, y):
+        x = self.forward_net(y)
+        h = self.encoder(torch.cat((x, y), dim=1))
+        mu, logvar = self.mu_head(h), self.logvar_head(h)
+        z = self.reparameterize(mu, logvar)
+
+        return self.decode(z, y), mu, logvar, x
+
 
 class cVAE_tandem(nn.Module):
     def __init__(self, input_size, latent_dim, hidden_dim=256, forward_dim=3):
@@ -393,50 +490,52 @@ class cVAE_new(nn.Module):
 
 
 class Generator(nn.Module):
-    def __init__(self, input_size, output_size, noise_dim=3, hidden_dim=128):
+    def __init__(self, input_size, output_size, noise_dim=3, hidden_dim=64):
         super(Generator, self).__init__()
 
         self.input_size = input_size
 
         self.net = nn.Sequential(*[nn.Linear(input_size + noise_dim, hidden_dim),
-                                   nn.ReLU(),
-                                   nn.BatchNorm1d(hidden_dim),
+                                   nn.LeakyReLU(0.2),
                                    nn.Linear(hidden_dim, hidden_dim),
-                                   nn.ReLU(),
-                                   nn.BatchNorm1d(hidden_dim),
+                                   nn.LeakyReLU(0.2),
                                    nn.Linear(hidden_dim, hidden_dim),
-                                   nn.ReLU(),
+                                   nn.LeakyReLU(0.2),
                                    nn.Linear(hidden_dim, output_size)])
 
     def forward(self, x, noise):
         y = self.net(torch.cat((x, noise), dim=1))
         return y
 
-
 class Discriminator(nn.Module):
-    def __init__(self, input_size, output_size, hidden_dim=128):
+    def __init__(self, input_size, output_size, hidden_dim=64):
         super(Discriminator, self).__init__()
 
-        self.net = nn.Sequential(*[nn.Linear(input_size, hidden_dim),
-                                   nn.ReLU(),
-                                   nn.BatchNorm1d(hidden_dim),
+        self.net = nn.Sequential(*[nn.Linear(input_size+output_size, hidden_dim),
+                                   nn.LeakyReLU(0.2),
+                                   #nn.BatchNorm1d(hidden_dim), #
+                                   #don't use batch norm for the D input layer and G output layer to aviod the oscillation and model instability 
                                    nn.Linear(hidden_dim, hidden_dim),
-                                   nn.ReLU()])
+                                   nn.LeakyReLU(0.2),
+                                   nn.Linear(hidden_dim, hidden_dim),
+                                   nn.LeakyReLU(0.2),
+                                   nn.Linear(hidden_dim, hidden_dim),
+                                   nn.LeakyReLU(0.2)])
+        
 
         # Output layers
         self.adv_layer = nn.Sequential(nn.Linear(hidden_dim, 1), nn.Sigmoid())
         # self.aux_layer = nn.Sequential(nn.Linear(128, 3))
 
-    def forward(self, x):
-        h = self.net(x)
+    def forward(self, y_fake, x):
+        h = self.net(torch.cat((y_fake, x), dim=1))
         validity = self.adv_layer(h)
         # label = self.aux_layer(h)
 
         return validity
 
-
 class cGAN(nn.Module):
-    def __init__(self, input_size, output_size, noise_dim=3, hidden_dim=128):
+    def __init__(self, input_size, output_size, noise_dim=3, hidden_dim=64):
         super(cGAN, self).__init__()
 
         self.generator = Generator(
@@ -449,19 +548,28 @@ class cGAN(nn.Module):
     def forward(self, x, noise):
 
         y_fake = self.generator(x, noise)
-        validity = self.discriminator(y_fake)
+        validity = self.discriminator(y_fake, x)
 
         return validity
 
-    def sample_noise(self, batch_size):
+    def sample_noise(self, batch_size, prior=1):
 
+        if prior == 1:
+            z = torch.tensor(np.random.normal(0, 1, (batch_size, self.noise_dim))).float()
+        else:
+            z = torch.tensor(np.random.uniform(0, 1, (batch_size, self.noise_dim))).float()
+        return z
+
+    def sample_noise_M(self, batch_size):
+        M = 100
         z = torch.tensor(np.random.normal(
-            0, 1, (batch_size, self.noise_dim))).float()
+            0, 1, (batch_size*M, self.noise_dim))).float()
         return z
 
 # invertible neural network
 
 class INN(nn.Module):
+
     def __init__(self, ndim_total, dim_x, dim_y, dim_z, hidden_dim = 128):
         super(INN, self).__init__()
 
@@ -507,3 +615,54 @@ class INN(nn.Module):
     # def add_noise_y(self, y, batch_size):
 
     #     y += self.y_noise_scale * torch.randn(batch_size, ndim_y, dtype=torch.float, device=device)
+
+
+class Discriminator_old(nn.Module):
+    def __init__(self, input_size, output_size, hidden_dim=64):
+        super(Discriminator, self).__init__()
+
+        self.net1 = nn.Sequential(*[nn.Linear(input_size+output_size, hidden_dim),
+                                   nn.ReLU(),
+                                   #nn.BatchNorm1d(hidden_dim), #
+                                   #don't use batch norm for the D input layer and G output layer to aviod the oscillation and model instability 
+                                   nn.Linear(hidden_dim, hidden_dim),
+                                   nn.ReLU(),
+                                   nn.BatchNorm1d(hidden_dim),
+                                   nn.Linear(hidden_dim, hidden_dim),
+                                   nn.ReLU(),
+                                   nn.BatchNorm1d(hidden_dim),
+                                   nn.Linear(hidden_dim, hidden_dim),
+                                   nn.ReLU()])
+        
+
+        # Output layers
+        self.adv_layer = nn.Sequential(nn.Linear(hidden_dim, 1), nn.Sigmoid())
+        # self.aux_layer = nn.Sequential(nn.Linear(128, 3))
+
+    def forward(self, y_fake, x):
+        h = self.net(torch.cat((y_fake, x), dim=1))
+        validity = self.adv_layer(h)
+        # label = self.aux_layer(h)
+
+        return validity
+
+class Generator_old(nn.Module):
+    def __init__(self, input_size, output_size, noise_dim=3, hidden_dim=64):
+        super(Generator, self).__init__()
+
+        self.input_size = input_size
+
+        self.net = nn.Sequential(*[nn.Linear(input_size + noise_dim, hidden_dim),
+                                   nn.ReLU(),
+                                   nn.BatchNorm1d(hidden_dim),
+                                   nn.Linear(hidden_dim, hidden_dim),
+                                   nn.ReLU(),
+                                   nn.BatchNorm1d(hidden_dim),
+                                   nn.Linear(hidden_dim, hidden_dim),
+                                   nn.ReLU(),
+                                   nn.Linear(hidden_dim, output_size)],
+                                   nn.ReLU())
+
+    def forward(self, x, noise):
+        y = self.net(torch.cat((x, noise), dim=1))
+        return y

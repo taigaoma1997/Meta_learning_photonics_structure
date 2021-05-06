@@ -6,10 +6,11 @@ from torch.nn import functional as F
 from utils import MMD_multiscale
 import matplotlib.pyplot as plt
 from sklearn.metrics import r2_score
+from configs import get_configs
 
 from models import MLP, TandemNet, cVAE, cGAN, INN, cVAE_GSNN, cVAE_hybrid
 from utils import evaluate_simple_inverse, evaluate_tandem_accuracy, evaluate_vae_inverse, evaluate_gan_inverse, evaluate_inn_inverse
-from utils import evaluate_forward_minmax_dataset, evaluate_tandem_minmax_accuracy, evaluate_vae_GSNN_minmax_inverse, evaluate_forward_minmax
+from utils import evaluate_forward_minmax_dataset, evaluate_gan_minmax_inverse, evaluate_tandem_minmax_accuracy, evaluate_vae_GSNN_minmax_inverse, evaluate_forward_minmax
 
 from configs import get_configs
 from plotting_utils import compare_cie_dist, compare_param_dist, plot_cie, plot_cie_raw_pred, plt_abs_err
@@ -40,8 +41,8 @@ class Trainer():
         self.test_loader = test_loader
         self.criterion = criterion
         self.epochs = epochs
-
         self.path = './models/' + model_name + '_trained.pth'
+        self.temp_path = './models/' + model_name + '_trained_temp.pth'
 
     def train(self):
         # x: structure ; y: CIE 
@@ -56,7 +57,19 @@ class Trainer():
             
         loss_epoch = 0
         for x, y in self.train_loader:
-
+            
+            if self.current_epoch%1000 == 0:
+                times = int(self.current_epoch/1000)
+                if self.model_name =='forward_model':
+                    configs = get_configs('forward_model')
+                    self.optimizer = torch.optim.Adam(self.model.parameters(), lr=pow(0.2, times)*configs['learning_rate'], weight_decay=configs['weight_decay'])
+                elif self.model_name =='tandem_net':
+                    configs = get_configs('forward_model')
+                    self.optimizer = torch.optim.Adam(self.model.inverse_model.parameters(), lr=pow(0.2, times)*configs['learning_rate'], weight_decay=configs['weight_decay'])
+                elif self.model_name =='vae_hybrid':
+                    configs = get_configs('vae_hybrid')
+                    self.optimizer = torch.optim.Adam(self.model.vae_model.parameters(), lr=pow(0.2, times)*configs['learning_rate'], weight_decay=configs['weight_decay'])
+            
             self.optimizer.zero_grad()
             x, y = x.to(DEVICE), y.to(DEVICE)
             pred = self.model(x, y)
@@ -198,37 +211,38 @@ class Trainer():
             KLD = -0.5 * torch.mean(1 + logvar - mu.pow(2) - logvar.exp())
             pred_loss = self.criterion(y_pred, y)
             
-            return recon_loss + replace_loss + KLD + pred_loss        
+            return recon_loss + replace_loss + KLD + 5*pred_loss        
         
         else:
             raise NotImplementedError
             
             
     def fit(self):
-        loss_all = np.zeros([2,self.epochs])
+        self.loss_all = np.zeros([2,self.epochs])
         loss_val_best = 100
-        
+
         for e in range(self.epochs):
             
+            self.current_epoch = e
             loss_train = self.train()
             loss_val = self.evaluate()
-            loss_all[0,e] = loss_train
-            loss_all[1,e] = loss_val
-            
-            if loss_val_best >= loss_all[1,e]:
-                # save the best model for smallest validation loss
-                loss_val_best = loss_all[1,e]
+            self.loss_all[0,e] = loss_train
+            self.loss_all[1,e] = loss_val
+
+            if loss_val_best >= self.loss_all[1,e]:
+            # save the best model for smallest validation loss
+                loss_val_best = self.loss_all[1,e]
                 loss_test = self.evaluate(test=True)
-                self.save_checkpoint(e, loss_val_best)
+                self.save_checkpoint(e, loss_test, self.loss_all, self.path)
+
+            print('Epoch {}, train loss {:.6f}, val loss {:.6f}'.format(e, loss_train, loss_val))
                 
-            print('Epoch {}, train loss {:.6f}, val loss {:.6f}'.format(
-            e, loss_train, loss_val))
-                
-            #cie_pred, cie_raw = evaluate_minmax_forward_dataset(self.model.forward_model, self.test_loader.dataset)
-            #plot_cie_raw_pred(cie_raw, cie_pred)
+
+            if e%10==0:
+                self.save_checkpoint(e, loss_val_best, self.loss_all, self.temp_path)
         
-        plt.plot(range(self.epochs),loss_all[0,:],label='Training loss')  
-        plt.plot(range(self.epochs),loss_all[1,:],label='Val Loss')                      
+        plt.plot(range(self.epochs),self.loss_all[0,:],label='Training loss')  
+        plt.plot(range(self.epochs),self.loss_all[1,:],label='Val Loss')                      
         # plot the training and val loss VS epoches.
         plt.xlabel('epochs')
         plt.ylabel('Loss')
@@ -246,7 +260,6 @@ class Trainer():
             cie_pred, cie_raw = evaluate_forward_minmax_dataset(forward_model, self.test_loader.dataset)
             plot_cie_raw_pred(cie_raw, cie_pred) # compare the r2 sore
             plt_abs_err(cie_raw, cie_pred)  # compare the absolute mean 
-            
         elif self.model_name in ['tandem_net']:
             forward_model = MLP(4, 3).to(DEVICE)
             inverse_model = MLP(3, 4).to(DEVICE)
@@ -257,12 +270,7 @@ class Trainer():
             plt_abs_err(cie_raw, cie_pred)  # compare the absolute mean 
             
         elif self.model_name in ['vae_hybrid']:
-            forward_model = MLP(4, 3).to(DEVICE)
-            configs = get_configs('vae_hybrid')
-            vae_GSNN_model = cVAE_GSNN(configs['input_dim'], configs['latent_dim']).to(DEVICE)
-            vae_hybrid_model = cVAE_hybrid(forward_model, vae_GSNN_model)
-            vae_hybrid_model.load_state_dict(torch.load(self.path)['model_state_dict'])
-            cie_raw, param_raw, cie_pred, param_pred = evaluate_vae_GSNN_minmax_inverse(vae_hybrid_model.vae_model, vae_hybrid_model.forward_model, self.test_loader.dataset)
+            cie_raw, param_raw, cie_pred, param_pred = evaluate_vae_GSNN_minmax_inverse(self.model.vae_model, self.model.forward_model, self.test_loader.dataset)
             plot_cie_raw_pred(cie_raw, cie_pred) # compare the r2 sore
             plt_abs_err(cie_raw, cie_pred)  # compare the absolute mean 
         else:
@@ -340,7 +348,7 @@ class Trainer():
         }, path_e)
         
 
-    def save_checkpoint(self, epoch, loss):
+    def save_checkpoint(self, epoch, loss, loss_all):
         # torch.save(self.model.state_dict(), './models/'+filename)
 
         torch.save({
@@ -348,6 +356,7 @@ class Trainer():
             'model_state_dict': self.model.state_dict(),
             'optimizer_state_dict': self.optimizer.state_dict(),
             'loss': loss,
+            'loss_all':loss_all,
         }, self.path)
 
     def load_checkpoint(self):
@@ -357,11 +366,153 @@ class Trainer():
         self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         epoch = checkpoint['epoch']
         loss = checkpoint['loss']
-
+        loss_all = checkpoint['loss_all']
         print("Loaded model, epoch {}, loss {}..".format(epoch, loss))
 
 # trainer class for GAN model
 class GANTrainer(Trainer):
+
+    def __init__(self,
+                model,
+                forward_model,
+                optimizer_G,
+                optimizer_D,
+                train_loader,
+                val_loader,
+                test_loader,
+                criterion,
+                epochs,
+                model_name,
+                n_critic,
+                clip_value):
+
+        self.model_name = model_name
+        self.model = model
+        self.forward_model = forward_model
+        self.train_loader = train_loader
+        self.val_loader = val_loader
+        self.test_loader = test_loader
+        self.criterion = criterion
+        self.epochs = epochs
+
+        self.optimizer_G = optimizer_G
+        self.optimizer_D = optimizer_D
+        self.path = './models/' + model_name + '_trained.pth'
+        self.temp_path = './models/' + model_name + '_trained_temp.pth'
+        self.critic = n_critic,
+        self.clip_value = clip_value
+
+    def train(self):
+        self.model.train()
+        loss_epoch = 0
+        g_loss_epoch = 0
+        d_loss_epoch = 0
+        i = 1
+        for x, y in self.train_loader:
+
+            batch_size = len(x)
+            x, y = x.to(DEVICE), y.to(DEVICE)
+
+            # Adversarial ground truths
+            valid = torch.ones(batch_size, 1).to(DEVICE)
+            fake = torch.zeros(batch_size, 1).to(DEVICE)
+
+            # -----------------
+            #  Train Discriminator
+            # -----------------
+
+            self.optimizer_D.zero_grad()
+            # generate batch of fake smaples
+            z = self.model.sample_noise(batch_size).to(DEVICE)
+            gen_y = self.model.generator(x, z)
+
+            validity = self.model.discriminator(gen_y, x)
+            valid = self.model.discriminator(y, x)
+
+            d_loss = -torch.mean(valid) +torch.mean(validity)
+            d_loss.backward()
+            self.optimizer_D.step()
+
+            for p in self.model.discriminator.parameters():
+                p.data.clamp_(-self.clip_value, self.clip_value)
+
+
+            # Train the generator
+            if i%5==0:
+                self.optimizer_G.zero_grad()
+                gen_y = self.model.generator(x, z)
+                g_loss = -torch.mean(self.model.discriminator(gen_y, x))
+                g_loss.backward()
+                self.optimizer_G.step()
+            else: 
+                g_loss = 0
+
+            g_loss_epoch += (g_loss* batch_size)
+            d_loss_epoch += (d_loss* batch_size)
+            i = i+1
+
+        g_loss_epoch, d_loss_epoch = g_loss_epoch / len(self.train_loader.dataset), d_loss_epoch / len(self.train_loader.dataset)
+        print('generator loss {:.6f}, discriminator loss {:.6f}'.format(g_loss_epoch, d_loss_epoch))
+        return g_loss_epoch + d_loss_epoch
+
+    def evaluate(self, test=False):
+        self.model.eval()
+        dataloader = self.test_loader if test else self.val_loader
+        with torch.no_grad():
+            loss_epoch = 0
+            i = 1
+            for x, y in dataloader:
+
+                batch_size = len(x)
+                x, y = x.to(DEVICE), y.to(DEVICE)
+                z = self.model.sample_noise(batch_size).to(DEVICE)
+                gen_y = self.model.generator(x, z)
+
+                validity = self.model.discriminator(gen_y, x)
+                valid = self.model.discriminator(y, x)
+
+                d_loss = -torch.mean(valid) +torch.mean(validity)
+
+                # Train the generator
+                if i%5==0:
+                    g_loss = -torch.mean(self.model.discriminator(gen_y, x))
+                else: 
+                    g_loss = 0
+                
+                i = i+1
+
+                loss_epoch += (g_loss + d_loss) * batch_size
+
+            cie_raw, param_raw, cie_pred, param_pred = evaluate_gan_minmax_inverse(self.model, self.forward_model, self.val_loader.dataset, show=0)
+            RMSE_cie_raw = np.sum(np.sqrt(np.average(np.square((cie_raw - cie_pred)),axis=0)))
+            loss_epoch_mean = loss_epoch / len(dataloader.dataset)
+        return RMSE_cie_raw
+
+
+    def save_checkpoint(self, epoch, loss, loss_all, path):
+        # torch.save(self.model.state_dict(), './models/'+filename)
+
+        torch.save({
+            'epoch': epoch,
+            'model_state_dict': self.model.state_dict(),
+            'G_optimizer_state_dict': self.optimizer_G.state_dict(),
+            'D_optimizer_state_dict': self.optimizer_D.state_dict(),
+            'loss': loss,
+            'loss_all':loss_all,
+        }, path)
+
+    def load_checkpoint(self):
+
+        checkpoint = torch.load(self.path)
+        self.model.load_state_dict(checkpoint['model_state_dict'])
+        self.optimizer_G.load_state_dict(checkpoint['G_optimizer_state_dict'])
+        self.optimizer_D.load_state_dict(checkpoint['D_optimizer_state_dict'])
+        epoch = checkpoint['epoch']
+        loss = checkpoint['loss']
+        loss_all = checkpoint['loss_all']
+        print("Loaded model, epoch {}, loss {}..".format(epoch, loss))
+
+class GANTrainer_old(Trainer):
 
     def __init__(self,
                 model,
@@ -384,11 +535,127 @@ class GANTrainer(Trainer):
 
         self.optimizer_G = optimizer_G
         self.optimizer_D = optimizer_D
-
         self.path = './models/' + model_name + '_trained.pth'
-        
-    def train(self):
-        self.model.train()
+        self.temp_path = './models/' + model_name + '_trained_temp.pth'
+
+    def train_old2(self):
+        #self.model.train()
+        loss_epoch = 0
+        g_loss_epoch = 0
+        d_loss_epoch = 0
+        M = 100
+        for x, y in self.train_loader:
+
+            batch_size = len(x)
+            x, y = x.to(DEVICE), y.to(DEVICE)
+            x = torch.cat([x]*M)
+            y = torch.cat([y]*M)
+
+            # Adversarial ground truths
+            valid = torch.ones(batch_size*M, 1).to(DEVICE)
+            fake = torch.zeros(batch_size*M, 1).to(DEVICE)
+
+            # -----------------
+            #  Train Generator
+            # -----------------
+
+            self.optimizer_G.zero_grad()
+            self.model.generator.train()
+            self.model.discriminator.eval()
+
+            # Sample noise and labels as generator input
+            z = self.model.sample_noise_M(batch_size).to(DEVICE)
+
+            # import pdb; pdb.set_trace()
+            # Generate a batch of samples
+            gen_y = self.model.generator(x, z)
+
+            # Loss measures generator's ability to fool the discriminator
+            validity = self.model.discriminator(gen_y, x)
+            g_loss = self.criterion(validity, valid)
+
+            g_loss.backward()
+            self.optimizer_G.step()
+
+            # ---------------------
+            #  Train Discriminator
+            # ---------------------
+
+            self.optimizer_D.zero_grad()
+            self.model.generator.eval()
+            self.model.discriminator.train()
+            # Loss for real images
+            real_pred = self.model.discriminator(y, x)
+            d_real_loss = self.criterion(real_pred, valid)
+            d_real_loss.backward()
+
+            # Loss for fake images
+            fake_pred = self.model.discriminator(gen_y.detach(), x)
+            d_fake_loss = self.criterion(fake_pred, fake)
+            d_fake_loss.backward()
+
+            # Total discriminator loss
+            d_loss = (d_real_loss + d_fake_loss) / 2
+
+            self.optimizer_D.step()
+
+            g_loss_epoch += g_loss.to('cpu').item() * batch_size
+            d_loss_epoch += d_loss.to('cpu').item() * batch_size
+
+        g_loss_epoch, d_loss_epoch = g_loss_epoch / len(self.train_loader.dataset), d_loss_epoch / len(self.train_loader.dataset)
+        print('generator loss {:.6f}, discriminator loss {:.6f}'.format(g_loss_epoch, d_loss_epoch))
+        return g_loss_epoch + d_loss_epoch
+
+    def evaluate_old2(self, test=False):
+        self.model.eval()
+        dataloader = self.test_loader if test else self.val_loader
+        with torch.no_grad():
+            loss_epoch = 0
+            M = 100
+            for x, y in dataloader:
+
+                batch_size = len(x)
+                x, y = x.to(DEVICE), y.to(DEVICE)
+                x = torch.cat([x]*M)
+                y = torch.cat([y]*M)
+
+                # Adversarial ground truths
+                valid = torch.ones(batch_size*M, 1).to(DEVICE)
+                fake = torch.zeros(batch_size*M, 1).to(DEVICE)
+
+                # Sample noise and labels as generator input
+                z = self.model.sample_noise_M(batch_size).to(DEVICE)
+
+                # Generate a batch of samples
+                gen_y = self.model.generator(x, z)
+
+                # Loss measures generator's ability to fool the discriminator
+                validity = self.model.discriminator(gen_y, x)
+                g_loss = self.criterion(validity, valid)
+
+
+                # Loss for real images
+                real_pred = self.model.discriminator(y, x)
+                d_real_loss = self.criterion(real_pred, valid)
+
+                # Loss for fake images
+                fake_pred = self.model.discriminator(gen_y.detach(), x)
+                d_fake_loss = self.criterion(fake_pred, fake)
+
+                # Total discriminator loss
+                d_loss = (d_real_loss + d_fake_loss) / 2
+
+                # Calculate discriminator accuracy
+                # pred = np.concatenate([real_aux.data.cpu().numpy(), fake_aux.data.cpu().numpy()], axis=0)
+                # gt = np.concatenate([labels.data.cpu().numpy(), gen_labels.data.cpu().numpy()], axis=0)
+                # d_acc = np.mean(np.argmax(pred, axis=1) == gt)
+
+                loss_epoch += (g_loss.to('cpu').item() + d_loss.to('cpu').item()) * batch_size
+
+        return loss_epoch / len(dataloader.dataset)
+
+    def train_old(self):
+        #self.model.train()
         loss_epoch = 0
         g_loss_epoch = 0
         d_loss_epoch = 0
@@ -407,16 +674,19 @@ class GANTrainer(Trainer):
             # -----------------
 
             self.optimizer_G.zero_grad()
+            self.model.generator.train()
+            self.model.discriminator.eval()
 
             # Sample noise and labels as generator input
             z = self.model.sample_noise(batch_size).to(DEVICE)
+            print(z.size)
 
             # import pdb; pdb.set_trace()
             # Generate a batch of samples
             gen_y = self.model.generator(x, z)
 
             # Loss measures generator's ability to fool the discriminator
-            validity = self.model.discriminator(gen_y)
+            validity = self.model.discriminator(gen_y, x)
             g_loss = self.criterion(validity, valid)
 
             g_loss.backward()
@@ -427,19 +697,21 @@ class GANTrainer(Trainer):
             # ---------------------
 
             self.optimizer_D.zero_grad()
-
+            self.model.generator.eval()
+            self.model.discriminator.train()
             # Loss for real images
-            real_pred = self.model.discriminator(y)
+            real_pred = self.model.discriminator(y, x)
             d_real_loss = self.criterion(real_pred, valid)
+            d_real_loss.backward()
 
             # Loss for fake images
-            fake_pred = self.model.discriminator(gen_y.detach())
+            fake_pred = self.model.discriminator(gen_y.detach(), x)
             d_fake_loss = self.criterion(fake_pred, fake)
+            d_fake_loss.backward()  # why backpropagate separately???
 
             # Total discriminator loss
             d_loss = (d_real_loss + d_fake_loss) / 2
 
-            d_loss.backward()
             self.optimizer_D.step()
 
             g_loss_epoch += g_loss.to('cpu').item() * batch_size
@@ -449,7 +721,7 @@ class GANTrainer(Trainer):
         print('generator loss {:.3f}, discriminator loss {:.3f}'.format(g_loss_epoch, d_loss_epoch))
         return g_loss_epoch + d_loss_epoch
 
-    def evaluate(self, test=False):
+    def evaluate_old(self, test=False):
         self.model.eval()
         dataloader = self.test_loader if test else self.val_loader
         with torch.no_grad():
@@ -470,16 +742,16 @@ class GANTrainer(Trainer):
                 gen_y = self.model.generator(x, z)
 
                 # Loss measures generator's ability to fool the discriminator
-                validity = self.model.discriminator(gen_y)
+                validity = self.model.discriminator(gen_y, x)
                 g_loss = self.criterion(validity, valid)
 
 
                 # Loss for real images
-                real_pred = self.model.discriminator(y)
+                real_pred = self.model.discriminator(y, x)
                 d_real_loss = self.criterion(real_pred, valid)
 
                 # Loss for fake images
-                fake_pred = self.model.discriminator(gen_y.detach())
+                fake_pred = self.model.discriminator(gen_y.detach(), x)
                 d_fake_loss = self.criterion(fake_pred, fake)
 
                 # Total discriminator loss
@@ -494,7 +766,8 @@ class GANTrainer(Trainer):
 
         return loss_epoch / len(dataloader.dataset)
 
-    def save_checkpoint(self, epoch, loss):
+
+    def save_checkpoint(self, epoch, loss, loss_all, path):
         # torch.save(self.model.state_dict(), './models/'+filename)
 
         torch.save({
@@ -503,7 +776,8 @@ class GANTrainer(Trainer):
             'G_optimizer_state_dict': self.optimizer_G.state_dict(),
             'D_optimizer_state_dict': self.optimizer_D.state_dict(),
             'loss': loss,
-        }, self.path)
+            'loss_all':loss_all,
+        }, path)
 
     def load_checkpoint(self):
 
@@ -513,7 +787,7 @@ class GANTrainer(Trainer):
         self.optimizer_D.load_state_dict(checkpoint['D_optimizer_state_dict'])
         epoch = checkpoint['epoch']
         loss = checkpoint['loss']
-
+        loss_all = checkpoint['loss_all']
         print("Loaded model, epoch {}, loss {}..".format(epoch, loss))
 
 # Trainer class for invertible neural network
