@@ -22,7 +22,7 @@ DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 # For tandem model
 
-# To speficy which GPU to use, run with: CUDA_VISIBLE_DEVICES=5,6 python tandem.py
+# To speficy which GPU to use, run with: CUDA_VISIBLE_DEVICES=5,6 python  tandem.py
 
 def train(model, train_loader, optimizer, criterion):
 
