@@ -18,7 +18,7 @@ DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser('nn models for inverse design')
-    parser.add_argument('--model', type=str, default='gan')
+    parser.add_argument('--model', type=str, default='inn')
     args = parser.parse_args()
 
     train_loader, val_loader, test_loader = get_dataloaders(args.model)

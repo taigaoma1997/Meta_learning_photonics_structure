@@ -115,7 +115,7 @@ def evaluate(model, val_loader, test_loader, optimizer_G, optimizer_D, forward_m
             loss_epoch += ((g_loss + d_loss) * batch_size)
         
         cie_raw, param_raw, cie_pred, param_pred = evaluate_gan_minmax_inverse(model, forward_model, val_loader.dataset, show=0)
-        rmse_cie_raw = np.sum(np.sqrt(np.average(np.square((cie_raw - cie_pred)),axis=0)))
+        rmse_cie_raw = np.sqrt(np.sum(np.average(np.square((cie_raw - cie_pred)),axis=0)))
         loss_epoch = loss_epoch / len(dataloader.dataset)
     return loss_epoch, rmse_cie_raw
 

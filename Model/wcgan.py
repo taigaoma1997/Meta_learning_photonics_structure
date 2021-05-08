@@ -101,7 +101,7 @@ def evaluate(model, val_loader, test_loader, optimizer_G, optimizer_D, forward_m
 
         
         cie_raw, param_raw, cie_pred, param_pred = evaluate_gan_minmax_inverse(model, forward_model, val_loader.dataset, show=0)
-        rmse_cie_raw = np.sum(np.sqrt(np.average(np.square((cie_raw - cie_pred)),axis=0)))
+        rmse_cie_raw = np.sqrt(np.sum(np.average(np.square((cie_raw - cie_pred)),axis=0)))
         loss_epoch = loss_epoch / len(dataloader.dataset)
     return loss_epoch, rmse_cie_raw
 
@@ -190,7 +190,7 @@ if __name__  == '__main__':
     parser.add_argument('--prior', type=int, default=1, help='1 for (0,1) normal distribution, 0 for (0,1) uniform distribution')
     parser.add_argument('--epochs', type=int, default=50000, help='Number of iteration steps')
     parser.add_argument('--n_critic', type=int, default=5, help='Number of discriminator iteration for each generator iteration' )
-    parser.add_argument('--clip_value', type=float, default=0.1, help='Clip value for discriminator parameters' )
+    parser.add_argument('--clip_value', type=float, default=1, help='Clip value for discriminator parameters' )
     parser.add_argument('--weight_decay', type=float, default=1e-5, help='Decay rate for the Adams optimizer')
     parser.add_argument('--g_lr', type=float, default=1e-3, help='Learning rate for generator')
     parser.add_argument('--d_lr', type=float, default=1e-3, help='Learning rate for discriminator')

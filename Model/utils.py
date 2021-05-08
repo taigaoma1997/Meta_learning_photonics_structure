@@ -494,6 +494,7 @@ def evaluate_tandem_minmax_accuracy(model, forward_model, dataset, show=1):
         x_raw: original structure parameters
         x_raw_pred: inversely designed parameters.
     '''
+
     model.eval()
     forward_model.eval()
     with torch.no_grad():
@@ -561,8 +562,8 @@ def evaluate_vae_GSNN_minmax_inverse(vae_GSNN_model, forward_model, dataset, sho
         rmse_cie_raw = torch.sqrt((y_pred_raw - y_raw).pow(2).sum(dim=1).mean())
 
         if show==1:
-            print("Tandem net Design RMSE loss {:.3f}".format(rmse_design.item()))
-            print('Tandem Design RMSE raw loss {:.3f}'.format(rmse_design_raw.item()))
+            print("VAE net Design RMSE loss {:.3f}".format(rmse_design.item()))
+            print('VAE Design RMSE raw loss {:.3f}'.format(rmse_design_raw.item()))
             print('Reconstruct net RMSE loss {:.3f}'.format(rmse_cie))
             print('Reconstruct RMSE loss raw {:.3f}'.format(rmse_cie_raw))
 
@@ -603,12 +604,75 @@ def evaluate_gan_minmax_inverse(gan_model, forward_model, dataset, show=1):
         rmse_cie_raw = torch.sqrt((x_pred_raw - x_raw).pow(2).sum(dim=1).mean())
 
         if show==1:
-            print("Tandem net Design RMSE loss {:.3f}".format(rmse_design.item()))
-            print('Tandem Design RMSE raw loss {:.3f}'.format(rmse_design_raw.item()))
+            print("GAN net Design RMSE loss {:.3f}".format(rmse_design.item()))
+            print('GAN Design RMSE raw loss {:.3f}'.format(rmse_design_raw.item()))
             print('Reconstruct net RMSE loss {:.3f}'.format(rmse_cie))
             print('Reconstruct RMSE loss raw {:.3f}'.format(rmse_cie_raw))
 
     return x_raw.cpu().numpy(), y_raw.cpu().numpy(), x_pred_raw.cpu().numpy(), y_pred_raw.cpu().numpy()
+
+
+def evaluate_inn_minmax_inverse(model, forward_model, dataset, show = 1):
+    # x: structure. y: CIE
+
+    model.eval()
+    
+    range_, min_ = torch.tensor(dataset.scaler.data_range_).to(DEVICE), torch.tensor(dataset.scaler.data_min_).to(DEVICE)
+
+    def infer_design(model, dataset):
+        x, y = dataset.x.to(DEVICE), dataset.y.to(DEVICE)
+        x_dim = x.size()[1]
+        y_clean = y.clone()
+
+        batch_size = len(x)
+        pad_x, pad_yz = model.create_padding(batch_size)
+        pad_x = pad_x.to(DEVICE)
+        pad_yz = pad_yz.to(DEVICE)
+
+        y += model.y_noise_scale * torch.randn(batch_size, y.size(1)).float().to(DEVICE)
+        y = torch.cat((torch.randn(batch_size, model.dim_z).float().to(DEVICE), pad_yz, y), dim = 1)
+
+        y = y_clean + model.y_noise_scale * torch.randn(batch_size, model.dim_y).to(DEVICE)
+
+        y_rev_rand = torch.cat((torch.randn(batch_size, model.dim_z).to(DEVICE), pad_yz, y), dim=1)
+        output_rev_rand = model(y_rev_rand, rev=True)[0]
+        x_pred = output_rev_rand[:, :model.dim_x]
+
+        return x_pred
+
+    with torch.no_grad():
+        x, y = dataset.x.to(DEVICE), dataset.y.to(DEVICE)
+        x_dim = x.size()[1]
+
+        x_pred = infer_design(model, dataset)
+        y_pred = forward_model(x_pred, y)
+    
+        x_pred_raw = x_pred *range_[:x_dim] + min_[:x_dim]
+        x_raw =  x *range_[:x_dim] +min_[:x_dim] 
+        
+        y_pred_raw = y_pred *range_[x_dim:] +min_[x_dim:]
+        y_raw =  y *range_[x_dim:] +min_[x_dim:]
+
+        # get MSE for the design
+        rmse_design = torch.sqrt((x_pred - x).pow(2).sum(dim=1).mean())
+        rmse_design_raw = torch.sqrt((x_pred_raw - x_raw).pow(2).sum(dim=1).mean())
+        rmse_cie = torch.sqrt((y_pred - y).pow(2).sum(dim=1).mean())
+        rmse_cie_raw = torch.sqrt((y_pred_raw - y_raw).pow(2).sum(dim=1).mean())
+
+        if show==1:
+            print("INN net Design RMSE loss {:.3f}".format(rmse_design.item()))
+            print('INN Design RMSE raw loss {:.3f}'.format(rmse_design_raw.item()))
+            print('Reconstruct net RMSE loss {:.3f}'.format(rmse_cie))
+            print('Reconstruct RMSE loss raw {:.3f}'.format(rmse_cie_raw))
+
+    return y_raw.cpu().numpy(), x_raw.cpu().numpy(), y_pred_raw.cpu().numpy(), x_pred_raw.cpu().numpy()
+
+
+
+
+
+
+
 
 def evaluate_gan_inverse(forward_model, gan_model, configs, dataset):
 

@@ -278,8 +278,10 @@ class Trainer():
             
             
     def fit_inn(self):
-        temp1 = np.zeros([2,self.epochs]);
+        temp1 = np.zeros([2,self.epochs])
         train_loader, val_loader, test_loader = get_dataloaders('tandem_net')
+        loss_val_best = 1000
+        
         for e in range(self.epochs):
             
             loss_train = self.train()
@@ -288,39 +290,6 @@ class Trainer():
             temp1[1,e] = loss_val
             print('Epoch {}, train loss {:.3f}, val loss {:.3f}'.format(
                 e, loss_train, loss_val))
-            if e%50 == 0:
-                plt.plot(range(self.epochs),temp1[0,:],label='Training loss')  
-                plt.plot(range(self.epochs),temp1[1,:],label='Val Loss')                      
-                # plot the training and val loss VS epoches.
-                plt.xlabel('epochs')
-                plt.ylabel('Loss')
-                plt.title('weight_decay: 1e-5 + learning_rate 5e-4 + Epochs %i' %e)
-                plt.ylim([0, 100])
-                plt.xlim([1, e])
-                plt.legend()
-                plt.show()
-                
-                loss_test = self.evaluate(test=True)
-                path_e  = './models/inn_trained_epoch_' + str(e) + '.pth'
-                self.save_checkpoint_e(e, loss_test, path_e)
-                
-                configs = get_configs('inn')
-                model_temp = INN(configs['ndim_total'], configs['input_dim'], configs['output_dim'], dim_z = configs['latent_dim']).to(DEVICE)
-                model_temp.load_state_dict(torch.load(path_e)['model_state_dict'], strict=False)
-                forward_model_temp = MLP(4, 3).to(DEVICE)
-                forward_model_temp.load_state_dict(torch.load('./models/forward_model_trained.pth')['model_state_dict'])
-                cie_raw, param_raw, cie_pred, param_pred = evaluate_inn_inverse(forward_model_temp, model_temp, configs, test_loader.dataset)
-                fig, ax = plt.subplots(1, 3, figsize=(10, 3))
-                titles = ['x', 'y', 'Y']
-                for i in range(3):
-                    raw_pred = np.array(sorted(zip(cie_raw[:, i], cie_pred[:, i])))
-                    ax[i].scatter(raw_pred[:, 0], raw_pred[:, 1])
-                    ax[i].plot([raw_pred[:,0].min(), raw_pred[:,0].max()], [raw_pred[:,1].min(), raw_pred[:,1].max()], c='k')
-                    ax[i].set_title(titles[i] + ' (r2 score = {:.3f})'.format(r2_score(raw_pred[:, 0], raw_pred[:, 1])))
-                    ax[i].set_xlabel('ground truth')
-                    ax[i].set_ylabel('predicted')
-                plt.show()
-                fig.savefig('./models/inn_trained_epoch_' + str(e) + '.png')
                                 
         
         plt.plot(range(self.epochs),temp1[0,:],label='Training loss')  
@@ -845,9 +814,12 @@ class INNTrainer(Trainer):
 
             self.optimizer.zero_grad()
 
-            output = self.model(x)
+            output = self.model(x)[0]
+
 
             y_short = torch.cat((y[:, :self.model.dim_z], y[:, -self.model.dim_y:]), dim = 1)
+
+    
 
             l = self.lambd_predict * self.criterion(output[:, self.model.dim_z:], y[:, self.model.dim_z:])
 
@@ -872,8 +844,8 @@ class INNTrainer(Trainer):
                             y), dim=1)
             y_rev_rand = torch.cat((torch.randn(batch_size, self.model.dim_z).to(DEVICE), pad_yz, y), dim=1)
             
-            output_rev = self.model(y_rev, rev=True)
-            output_rev_rand = self.model(y_rev_rand, rev=True)
+            output_rev = self.model(y_rev, rev=True)[0]
+            output_rev_rand = self.model(y_rev_rand, rev=True)[0]
 
             l_rev = (
                 self.lambd_rev
@@ -888,7 +860,9 @@ class INNTrainer(Trainer):
             l_rev.backward()
 
             for p in self.model.parameters():
-                p.grad.data.clamp_(-15.00, 15.00)
+                if p.grad!=None: 
+                    #print(type(p.grad))               
+                    p.grad.data.clamp_(-15.00, 15.00)
 
             self.optimizer.step()
 
@@ -921,7 +895,7 @@ class INNTrainer(Trainer):
                 x = torch.cat((x, pad_x), dim = 1)
                 y = torch.cat((torch.randn(batch_size, self.model.dim_z).float().to(DEVICE), pad_yz, y), dim = 1)
 
-                output = self.model(x)
+                output = self.model(x)[0]
 
                 y_short = torch.cat((y[:, :self.model.dim_z], y[:, -self.model.dim_y:]), dim = 1)
 
@@ -945,8 +919,8 @@ class INNTrainer(Trainer):
                 y_rev = torch.cat((orig_z_perturbed, pad_yz, y), dim=1)
                 y_rev_rand = torch.cat((torch.randn(batch_size, self.model.dim_z).to(DEVICE), pad_yz, y), dim=1)
                 
-                output_rev = self.model(y_rev, rev=True)
-                output_rev_rand = self.model(y_rev_rand, rev=True)
+                output_rev = self.model(y_rev, rev=True)[0]
+                output_rev_rand = self.model(y_rev_rand, rev=True)[0]
 
                 l_rev = (
                     self.lambd_rev
@@ -960,7 +934,8 @@ class INNTrainer(Trainer):
                 loss_epoch += l_rev.data.item() * len(x)
 
                 for p in self.model.parameters():
-                    p.grad.data.clamp_(-15.00, 15.00)
+                    if p.grad!=None:
+                        p.grad.data.clamp_(-15.00, 15.00)
             # loss_epoch += loss.to('cpu').item() * len(x) + l_rev
 
         return loss_epoch / len(dataloader.dataset)

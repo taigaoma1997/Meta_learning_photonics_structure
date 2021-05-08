@@ -50,25 +50,33 @@ def train(model, train_loader, optimizer, criterion):
     return loss_epoch
 
 
-def evaluate(model, val_loader, test_loader, optimizer, criterion, test=False):
+def evaluate(model, val_loader, test_loader, optimizer, forward_model, criterion, test=False):
 
     # x: structure ; y: CIE 
-
+    # loss_epoch: loss using the same forward model; loss_epoch_2: loss using a different forward model 
     model.eval()
     dataloader = test_loader if test else val_loader
 
     with torch.no_grad():
         loss_epoch = 0
+        loss_epoch_2 = 0
         
         for x, y in dataloader:
             x, y = x.to(DEVICE), y.to(DEVICE)
             y_pred = model(x, y)
+
             loss = criterion(y_pred, y)
             loss_epoch += loss*len(x)
+            
+            x_pred = model.pred(y)
+            y_pred_2 = forward_model(x_pred, None)
+            loss_2 = criterion(y_pred_2, y)
+            loss_epoch_2 += loss_2*len(x)
         
         loss_epoch = loss_epoch / len(dataloader.dataset)
+        loss_epoch_2 = loss_epoch_2 / len(dataloader.dataset)
 
-    return loss_epoch
+    return loss_epoch, loss_epoch_2
 
 
 def save_checkpoint(model, optimizer, epoch, loss_all, path, configs):
@@ -107,15 +115,16 @@ def main(configs):
     path_temp = './models/tandem/tandem_'+'_lr_'+str(configs.lr)+'_STEP_'+ str(configs.if_lr_de) +'_trained_temp.pth'
 
     epochs = configs.epochs
-    loss_all = np.zeros([2, configs.epochs])
+    loss_all = np.zeros([3, configs.epochs])
     loss_val_best = 100
     
     for e in range(epochs):
 
         loss_train = train(model, train_loader, optimizer, criterion)
-        loss_val = evaluate(model, val_loader, test_loader, optimizer, criterion)
+        loss_val, loss_val_2 = evaluate(model, val_loader, test_loader, optimizer, criterion)
         loss_all[0,e] = loss_train
         loss_all[1,e] = loss_val
+        loss_all[2,e] = loss_val_2
 
         if loss_val_best >= loss_all[1,e]:
             # save the best model for smallest validation RMSE
