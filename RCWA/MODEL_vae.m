@@ -1,6 +1,6 @@
 %% so far we only need to simulate for models: vae_Full, vae_hybrid, vae_GSNN, vae_tandem
 
-model = 'cgan_T_300';  
+model = 'cgan_T_1338';  
 filename = strcat('./data_predicted/param_', model, '_pred.mat');
 filename_save = strcat('./data_predicted/spectrum/spectrum_param_', model, '_pred.mat');
 load(filename);
@@ -77,4 +77,5 @@ xyY(:,3) = XYZ(:,2);
 
 xyY_pred = xyY;
 filename_save_xyY = strcat('./data_predicted/xyY/xyY_param_', model, '_pred.mat');
-save(filename_save_xyY, 'param_test','param_pred','CIE_x','xyY_pred','cie_pred');
+%save(filename_save_xyY, 'param_test','param_pred','CIE_x','xyY_pred','cie_pred');
+save(filename_save_xyY, 'xyY_pred');
