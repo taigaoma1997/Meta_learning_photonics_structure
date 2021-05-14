@@ -1,81 +1,81 @@
 %% so far we only need to simulate for models: vae_Full, vae_hybrid, vae_GSNN, vae_tandem
+function sim = eval(model)
+    sim = 1
+    %model = 'cgan_T_300';  
+    filename = strcat('./data_predicted/param_', model, '_pred.mat');
+    filename_save = strcat('./data_predicted/spectrum/spectrum_param_', model, '_pred.mat');
+    load(filename);
 
-model = 'cgan_T_1338';  
-filename = strcat('./data_predicted/param_', model, '_pred.mat');
-filename_save = strcat('./data_predicted/spectrum/spectrum_param_', model, '_pred.mat');
-load(filename);
+    M = size(param_pred,1);
+    N = size(param_pred,2);
 
-M = size(param_pred,1);
-N = size(param_pred,2);
+    parpool('local', 85)  % set up the total number of parallel computing cpu cores
 
-parpool('local', 85)  % set up the total number of parallel computing cpu cores
+    if isfile(filename_save)==0
+        param_pred_re = param_pred.';
+        param_pred_re = reshape(param_pred_re, 4,[]);
+        param_pred_re = param_pred_re.';  % this part is useful when the the predicted structure has multiple structures 
 
-if isfile(filename_save)==0
-    param_pred_re = param_pred.';
-    param_pred_re = reshape(param_pred_re, 4,[]);
-    param_pred_re = param_pred_re.';  % this part is useful when the the predicted structure has multiple structures 
+        param_pred_re = param_pred(:,1:4);
+        START = 1;
+        END = M;
+        CURRENT = 1;
+    else
+        load(filename_save);
+        param_pred_re = param_pred.';
+        param_pred_re = reshape(param_pred_re, 4,[]);
+        param_pred_re = param_pred_re.';
 
-    param_pred_re = param_pred(:,1:4);
-    START = 1;
-    END = M;
-    CURRENT = 1;
-else
-    load(filename_save);
-    param_pred_re = param_pred.';
-    param_pred_re = reshape(param_pred_re, 4,[]);
-    param_pred_re = param_pred_re.';
-
-    param_pred_re = param_pred(:,1:4);
-end
-
-
-
-acc = 10;
-stepcase = 5;
-show1 = 0;
-
-if CURRENT>END
-    fprintf('This simulation is already done! \n');
-else
-    for i = CURRENT:1:END   % we start from the last data in case the simulation was stopped at the saving part. 
-    tic
-refls = RCWA_Silicon(param_pred_re(i,1), param_pred_re(i,2), param_pred_re(i,3), param_pred_re(i,4), acc, show1,stepcase);
-    spectrum(i,:) = refls;
-    CURRENT = i;
-    spectrum = spectrum(1:CURRENT,:);
-    save(filename_save,'spectrum', 'START','END', 'CURRENT');
-    i
-    toc
+        param_pred_re = param_pred(:,1:4);
     end
-end
-
-fprintf('Simulation done! \n');
-
-delete(gcp('nocreate')); % close the parallel computing
 
 
-wave = 380:5:780;
-figure(10)
-plot(wave, spectrum)
-axis([380 780 0 1]);
-xlabel('Wavelength/(nm)');
-ylabel('Reflection');
 
-%% This part is to transform spectrum data into xyY data and save them
+    acc = 10;
+    stepcase = 5;
+    show1 = 0;
 
-CIE =  importdata('./color/cie-cmf.txt');
-load('./color/D65.mat');
+    if CURRENT>END
+        fprintf('This simulation is already done! \n');
+    else
+        for i = CURRENT:1:END   % we start from the last data in case the simulation was stopped at the saving part. 
+        tic
+    refls = RCWA_Silicon(param_pred_re(i,1), param_pred_re(i,2), param_pred_re(i,3), param_pred_re(i,4), acc, show1,stepcase);
+        spectrum(i,:) = refls;
+        CURRENT = i;
+        spectrum = spectrum(1:CURRENT,:);
+        save(filename_save,'spectrum', 'START','END', 'CURRENT');
+        i
+        toc
+        end
+    end
 
-K = D65 * CIE(:,3)/100;   % a normalization constant
-temp = transpose(CIE(:,2:4)).*D65/100; 
-XYZ = spectrum * transpose(temp)/K;
-xyz = XYZ./sum(XYZ, 2);
-xyY = xyz;
-xyY(:,3) = XYZ(:,2);
+    fprintf('Simulation done! \n');
 
-%% Save data 
+    delete(gcp('nocreate')); % close the parallel computing
 
-xyY_pred = xyY;
-filename_save_xyY = strcat('./data_predicted/xyY/xyY_param_', model, '_pred.mat');
-%save(filename_save_xyY, 'param_test','param_pred','CIE_x','xyY_pred','cie_pred');
-save(filename_save_xyY, 'xyY_pred');
+
+    wave = 380:5:780;
+    figure(10)
+    plot(wave, spectrum)
+    axis([380 780 0 1]);
+    xlabel('Wavelength/(nm)');
+    ylabel('Reflection');
+
+    %% This part is to transform spectrum data into xyY data and save them
+
+    CIE =  importdata('/data/mtobah/Meta_learning_photonics_structure-main_6/RCWA/color/cie-cmf.txt');
+    load('/data/mtobah/Meta_learning_photonics_structure-main_6/RCWA/color/D65.mat');
+
+    K = D65 * CIE(:,3)/100;   % a normalization constant
+    temp = transpose(CIE(:,2:4)).*D65/100; 
+    XYZ = spectrum * transpose(temp)/K;
+    xyz = XYZ./sum(XYZ, 2);
+    xyY = xyz;
+    xyY(:,3) = XYZ(:,2);
+
+    %% Save data 
+
+    xyY_pred = xyY;
+    filename_save_xyY = strcat('./data_predicted/xyY/xyY_param_', model, '_pred.mat');
+    save(filename_save_xyY, 'param_test','param_pred','CIE_x','xyY_pred','cie_pred');
