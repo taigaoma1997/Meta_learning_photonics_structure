@@ -29,6 +29,29 @@ class MLP(nn.Module):
     def forward(self, x, y):
         return self.net(x)
 
+class MLP_sigmoid(nn.Module):
+
+    def __init__(self, input_size, output_size, hidden_dim=64):
+        super(MLP_sigmoid, self).__init__()
+        '''
+        layer_sizes: list of input sizes: forward/inverse model: 4 layers with 320 nodes in each layer
+        '''
+
+        self.net = nn.Sequential(*[nn.Linear(input_size, hidden_dim),
+                                   nn.ReLU(),
+                                   nn.BatchNorm1d(hidden_dim),
+                                   nn.Linear(hidden_dim, hidden_dim),
+                                   nn.ReLU(),
+                                   nn.BatchNorm1d(hidden_dim),
+                                   nn.Linear(hidden_dim, hidden_dim),
+                                   nn.ReLU(),
+                                   nn.BatchNorm1d(hidden_dim),
+                                   nn.Linear(hidden_dim, output_size),
+                                   nn.Sigmoid()])
+
+    def forward(self, x, y):
+        return self.net(x)
+
 class MLP_deep(nn.Module):
 
     def __init__(self, input_size, output_size):
